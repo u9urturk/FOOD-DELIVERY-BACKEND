@@ -42,18 +42,28 @@ async function bootstrap() {
   // Setup Swagger before setting global prefix
   setupSwagger(app);
 
-  // Health check endpoint
+  // Set API prefix
+  app.setGlobalPrefix('api/v1');
+
+  // Health check endpoint (outside of API prefix)
   app.getHttpAdapter().get('/health', (req, res) => {
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
+      message: 'Food Delivery Backend is running'
     });
   });
 
-  // API prefix - commented out for simpler URLs
-  // app.setGlobalPrefix('api/v1');
+  // Root health check for Railway
+  app.getHttpAdapter().get('/', (req, res) => {
+    res.status(200).json({
+      status: 'ok',
+      message: 'Food Delivery Backend API',
+      documentation: '/api/docs'
+    });
+  });
 
   const port = configService.get('PORT', 3000);
   await app.listen(port, '0.0.0.0');

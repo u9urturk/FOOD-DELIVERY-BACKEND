@@ -56,9 +56,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 
-# Copy entrypoint script
+# Copy entrypoint scripts
 COPY docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh
+COPY docker-entrypoint-railway.sh ./
+RUN chmod +x docker-entrypoint.sh docker-entrypoint-railway.sh
 
 # Change ownership to app user
 RUN chown -R nestjs:nodejs /app
@@ -68,9 +69,9 @@ USER nestjs
 EXPOSE 3000
 
 # Health check for Railway
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD node -e "const http = require('http'); \
-    const options = { host: 'localhost', port: process.env.PORT || 3000, path: '/api/v1', timeout: 2000 }; \
+    const options = { host: '0.0.0.0', port: process.env.PORT || 3000, path: '/health', timeout: 5000 }; \
     const req = http.request(options, (res) => { \
       if (res.statusCode === 200) process.exit(0); \
       else process.exit(1); \
@@ -78,6 +79,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     req.on('error', () => process.exit(1)); \
     req.end();"
 
-# Start the application
-ENTRYPOINT ["./docker-entrypoint.sh"]
+# Start the application with Railway entrypoint
+ENTRYPOINT ["./docker-entrypoint-railway.sh"]
 CMD ["node", "dist/src/main"]
