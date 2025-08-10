@@ -59,7 +59,8 @@ COPY --from=builder /app/prisma ./prisma
 # Copy entrypoint scripts
 COPY docker-entrypoint.sh ./
 COPY docker-entrypoint-railway.sh ./
-RUN chmod +x docker-entrypoint.sh docker-entrypoint-railway.sh
+COPY docker-entrypoint-railway-smart.sh ./
+RUN chmod +x docker-entrypoint.sh docker-entrypoint-railway.sh docker-entrypoint-railway-smart.sh
 
 # Change ownership to app user
 RUN chown -R nestjs:nodejs /app
@@ -79,6 +80,6 @@ EXPOSE 3000
 #     req.on('error', () => process.exit(1)); \
 #     req.end();"
 
-# Start the application with Railway entrypoint
-ENTRYPOINT ["./docker-entrypoint-railway.sh"]
+# Start the application with smart Railway entrypoint
+ENTRYPOINT ["./docker-entrypoint-railway-smart.sh"]
 CMD ["node", "dist/src/main"]

@@ -46,6 +46,29 @@ TOTP_ISSUER=Food Delivery App
 THROTTLE_TTL=60
 THROTTLE_LIMIT=100
 PRISMA_CLI_BINARY_TARGETS=linux-musl
+RAILWAY_SEED_ON_DEPLOY=true
+```
+
+### 🤖 Smart Database Management
+
+The deployment includes intelligent database management:
+
+**First Deploy:**
+- ✅ Detects empty database
+- ✅ Runs migrations automatically  
+- ✅ Seeds initial data (if RAILWAY_SEED_ON_DEPLOY=true)
+
+**Subsequent Deploys:**
+- ✅ Detects existing database
+- ✅ Runs migrations if needed
+- ⏭️ Skips seeding (data preserved)
+- 🔄 Re-seeds only if no users exist
+
+**Environment Controls:**
+```bash
+RAILWAY_SEED_ON_DEPLOY=true   # Enable seeding on first deploy
+RAILWAY_SEED_ON_DEPLOY=false  # Disable all seeding
+# (unset)                     # Smart seeding (recommended)
 ```
 
 ### 5. Deploy Settings
