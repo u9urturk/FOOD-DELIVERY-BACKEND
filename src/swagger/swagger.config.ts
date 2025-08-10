@@ -15,8 +15,8 @@ export function setupSwagger(app: INestApplication): void {
       **Base URL:** /api/v1
     `)
     .setVersion('1.0')
-    .addServer('https://food-delivery-backend-production-b326.up.railway.app/api/v1', 'Production API')
-    .addServer('http://localhost:3000/api/v1', 'Development API')
+    .addServer('https://food-delivery-backend-production-b326.up.railway.app', 'Production API')
+    .addServer('http://localhost:3000', 'Development API')
     .addBearerAuth(
       {
         type: 'http',
