@@ -1,0 +1,123 @@
+# ==============================================
+# Production Docker Compose for Render.com
+# ==============================================
+version: '3.8'
+
+services:
+  # ===========================================
+  # PostgreSQL Database
+  # ===========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: food-delivery-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: food_delivery
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: production_postgres_pass_123
+      PGDATA: /data/postgres
+    volumes:
+      - postgres_data:/data/postgres
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    networks:
+      - food_delivery_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Redis Cache
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: food-delivery-redis-prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass production_redis_pass_123
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - food_delivery_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "production_redis_pass_123", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ===========================================
+  # NestJS Application
+  # ===========================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: food-delivery-app-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:production_postgres_pass_123@postgres:5432/food_delivery?schema=public
+      REDIS_URL: redis://:production_redis_pass_123@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: production_redis_pass_123
+      JWT_SECRET: production-jwt-secret-key-minimum-64-characters-long-secure-string
+      JWT_REFRESH_SECRET: production-refresh-secret-key-minimum-64-characters-long-secure
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,https://yourdomain.com
+      THROTTLE_TTL: 60000
+      THROTTLE_LIMIT: 1000
+      THROTTLE_AUTH_LIMIT: 50
+      LOG_LEVEL: info
+      BCRYPT_ROUNDS: 12
+      SEED_DATABASE: "true"
+      DEBUG_SQL: "false"
+    ports:
+      - "${PORT:-3000}:3000"
+    networks:
+      - food_delivery_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    volumes:
+      - app_logs:/app/logs
+      - app_uploads:/app/uploads
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  food_delivery_network:
+    driver: bridge
+    name: food_delivery_network
+
+# ===========================================
+# Volumes
+# ===========================================
+volumes:
+  postgres_data:
+    driver: local
+    name: food_delivery_postgres_data
+  redis_data:
+    driver: local
+    name: food_delivery_redis_data
+  app_logs:
+    driver: local
+    name: food_delivery_app_logs
+  app_uploads:
+    driver: local
+    name: food_delivery_app_uploads

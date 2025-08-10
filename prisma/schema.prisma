@@ -1,0 +1,458 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User & Auth Models
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  otpSecret    String?
+  otpEnabled   Boolean  @default(false)
+  recoveryCode String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders          Order[]
+  stockMovements  StockMovement[]
+  notifications   Notification[]
+  userRoles UserRole[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userRoles UserRole[]
+  rolePermissions RolePermission[]
+  
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  rolePermissions RolePermission[]
+  
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String   
+  roleId String  
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role  Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String    
+  permissionId String   
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// Menu Models
+model MenuCategory {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  isActive    Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  menuItems MenuItem[]
+
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  categoryId  String
+  category    MenuCategory @relation(fields: [categoryId], references: [id])
+  price       Decimal     @db.Decimal(10, 2)
+  images      String[]
+  status      MenuStatus  @default(ACTIVE)
+  
+  // Statistics
+  rating      Decimal?    @db.Decimal(3, 2)
+  views       Int         @default(0)
+  likes       Int         @default(0)
+  popularity  Int         @default(0)
+  prepTime    Int?        // dakika
+  
+  // Meta info
+  ingredients String[]
+  allergens   String[]
+  isSpecial   Boolean     @default(false)
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  variants    MenuItemVariant[]
+  orderItems  OrderItem[]
+
+  @@map("menu_items")
+}
+
+model MenuItemVariant {
+  id         String   @id @default(cuid())
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("menu_item_variants")
+}
+
+// Restaurant & Table Models
+model Table {
+  id              String      @id @default(cuid())
+  number          Int         @unique
+  capacity        Int
+  status          TableStatus @default(AVAILABLE)
+  area            TableArea?
+  
+  // Time info
+  occupiedAt      DateTime?
+  reservedAt      DateTime?
+  serviceStartTime DateTime?
+  
+  // Waiter assignment
+  waiterId        String?
+  waiter          Waiter?     @relation(fields: [waiterId], references: [id])
+  
+  // Cleaning status
+  cleanStatus     Boolean     @default(true)
+  lastOrderTime   DateTime?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  orders          Order[]
+
+  @@map("tables")
+}
+
+model Waiter {
+  id                  String     @id @default(cuid())
+  name                String
+  phone               String?
+  email               String?
+  shift               WaiterShift
+  isActive            Boolean    @default(true)
+  
+  // Performance metrics
+  performanceScore    Decimal?   @db.Decimal(3, 2)
+  currentOrdersCount  Int        @default(0)
+  
+  // Profile info
+  joiningDate         DateTime
+  avatar              String?
+  
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  tables              Table[]
+  orders              Order[]
+  performances        WaiterPerformance[]
+
+  @@map("waiters")
+}
+
+model WaiterPerformance {
+  id               String   @id @default(cuid())
+  waiterId         String
+  waiter           Waiter   @relation(fields: [waiterId], references: [id])
+  date             DateTime
+  totalOrders      Int      @default(0)
+  completedOrders  Int      @default(0)
+  avgServiceTime   Int      @default(0) // dakika
+  customerRating   Decimal  @db.Decimal(3, 2) @default(0)
+  efficiency       Int      @default(0) // yüzde
+  createdAt        DateTime @default(now())
+
+  @@unique([waiterId, date])
+  @@map("waiter_performances")
+}
+
+// Order Models
+model Order {
+  id            String        @id @default(cuid())
+  tableId       String
+  table         Table         @relation(fields: [tableId], references: [id])
+  status        OrderStatus   @default(PENDING)
+  totalAmount   Decimal       @db.Decimal(10, 2)
+  
+  // Time info
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  servedAt      DateTime?
+  
+  // Waiter info
+  waiterId      String?
+  waiter        Waiter?       @relation(fields: [waiterId], references: [id])
+  
+  // Payment info
+  paymentMethod PaymentMethod?
+  isPaid        Boolean       @default(false)
+  paidAt        DateTime?
+  
+  // User info
+  userId        String?
+  user          User?         @relation(fields: [userId], references: [id])
+
+  items         OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String    @id @default(cuid())
+  orderId      String
+  order        Order     @relation(fields: [orderId], references: [id])
+  menuItemId   String
+  menuItem     MenuItem  @relation(fields: [menuItemId], references: [id])
+  quantity     Int
+  unitPrice    Decimal   @db.Decimal(10, 2)
+  totalPrice   Decimal   @db.Decimal(10, 2)
+  notes        String[]
+  status       OrderStatus @default(PENDING)
+  
+  // Variant info
+  variantId    String?
+  variantName  String?
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("order_items")
+}
+
+// Stock Models
+model StockItem {
+  id           String     @id @default(cuid())
+  name         String
+  category     String
+  barcode      String?    @unique
+  
+  // Unit info
+  unit         String     // kg, L, adet
+  quantity     Decimal    @db.Decimal(10, 3)
+  minQuantity  Decimal    @db.Decimal(10, 3)
+  maxQuantity  Decimal    @db.Decimal(10, 3)
+  
+  // Price info
+  unitPrice    Decimal    @db.Decimal(10, 2)
+  
+  // Supplier info
+  supplierId   String?
+  supplier     Supplier?  @relation(fields: [supplierId], references: [id])
+  
+  // Meta info
+  description  String?
+  notes        String?
+  status       StockStatus @default(ACTIVE)
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  movements    StockMovement[]
+
+  @@map("stock_items")
+}
+
+model StockMovement {
+  id               String           @id @default(cuid())
+  stockItemId      String
+  stockItem        StockItem        @relation(fields: [stockItemId], references: [id])
+  type             StockMovementType
+  quantity         Decimal          @db.Decimal(10, 3)
+  previousQuantity Decimal          @db.Decimal(10, 3)
+  newQuantity      Decimal          @db.Decimal(10, 3)
+  reason           String?
+  userId           String?
+  user             User?            @relation(fields: [userId], references: [id])
+  createdAt        DateTime         @default(now())
+
+  @@map("stock_movements")
+}
+
+model Supplier {
+  id            String      @id @default(cuid())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  stockItems    StockItem[]
+
+  @@map("suppliers")
+}
+
+// Analytics Models
+model RevenueData {
+  id           String      @id @default(cuid())
+  date         DateTime
+  revenue      Decimal     @db.Decimal(10, 2)
+  orderCount   Int
+  avgOrderValue Decimal    @db.Decimal(10, 2)
+  period       Period
+  createdAt    DateTime    @default(now())
+
+  @@unique([date, period])
+  @@map("revenue_data")
+}
+
+model TopSellingItem {
+  id            String   @id @default(cuid())
+  menuItemId    String
+  menuItemName  String
+  category      String
+  totalQuantity Int
+  totalRevenue  Decimal  @db.Decimal(10, 2)
+  percentage    Decimal  @db.Decimal(5, 2)
+  period        DateTime
+  createdAt     DateTime @default(now())
+
+  @@map("top_selling_items")
+}
+
+model DashboardStats {
+  id              String   @id @default(cuid())
+  date            DateTime @unique
+  totalOrders     Int      @default(0)
+  totalRevenue    Decimal  @db.Decimal(10, 2) @default(0)
+  totalCustomers  Int      @default(0)
+  avgOrderValue   Decimal  @db.Decimal(10, 2) @default(0)
+  activeTables    Int      @default(0)
+  availableTables Int      @default(0)
+  reservedTables  Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@map("dashboard_stats")
+}
+
+// Notification Model
+model Notification {
+  id       String           @id @default(cuid())
+  type     NotificationType
+  title    String
+  message  String
+  isRead   Boolean          @default(false)
+  userId   String?
+  user     User?            @relation(fields: [userId], references: [id])
+  tableId  String?
+  orderId  String?
+  priority NotificationPriority @default(MEDIUM)
+  createdAt DateTime        @default(now())
+  readAt   DateTime?
+
+  @@map("notifications")
+}
+
+// Enums
+
+
+enum MenuStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+}
+
+enum TableArea {
+  GARDEN
+  INDOOR
+  TERRACE
+}
+
+enum WaiterShift {
+  MORNING
+  AFTERNOON
+  EVENING
+  NIGHT
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
+enum StockStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+enum Period {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum NotificationType {
+  ORDER
+  PAYMENT
+  STOCK
+  SYSTEM
+}
+
+enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
