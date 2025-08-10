@@ -17,11 +17,15 @@ async function bootstrap() {
   app.use(compression());
 
   // CORS
+  const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? (process.env.FRONTEND_URL || '').split(',').filter(url => url.trim())
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4200'];
+
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production'
-      ? ['https://yourdomain.com']
-      : true,
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
 
   // Global pipes
