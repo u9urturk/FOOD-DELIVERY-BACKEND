@@ -26,8 +26,8 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the application
-RUN npm run build
+# Build the application and compile seed
+RUN npm run build && npx tsc prisma/seed.ts --outDir dist/prisma --module commonjs --target es2023 --moduleResolution node --esModuleInterop true --allowSyntheticDefaultImports true --experimentalDecorators true --emitDecoratorMetadata true
 
 # Remove dev dependencies
 RUN npm ci --frozen-lockfile --only=production && npm cache clean --force
