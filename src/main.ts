@@ -39,11 +39,11 @@ async function bootstrap() {
   // Global interceptors
   app.useGlobalInterceptors(new ResponseInterceptor());
 
-  // Setup Swagger before setting global prefix
-  setupSwagger(app);
-
-  // Set API prefix
+  // Set API prefix first
   app.setGlobalPrefix('api/v1');
+
+  // Setup Swagger after setting global prefix
+  setupSwagger(app);
 
   // Health check endpoint (outside of API prefix)
   app.getHttpAdapter().get('/health', async (req, res) => {
