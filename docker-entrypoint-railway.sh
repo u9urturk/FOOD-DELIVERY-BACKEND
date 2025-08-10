@@ -4,11 +4,22 @@ set -e
 echo "🚀 Starting Food Delivery Backend on Railway..."
 
 # Check required environment variables
+echo "🔍 Checking required environment variables..."
+
 if [ -z "$DATABASE_URL" ]; then
     echo "❌ ERROR: DATABASE_URL environment variable is not set!"
-    echo "Please check Railway Dashboard → Variables tab"
-    echo "Current env vars:"
-    env | grep -E "(DATABASE|RAILWAY)" || echo "No database env vars found"
+    exit 1
+fi
+
+if [ -z "$JWT_SECRET" ]; then
+    echo "❌ ERROR: JWT_SECRET environment variable is not set!"
+    echo "Please add JWT_SECRET to Railway Dashboard → Variables"
+    exit 1
+fi
+
+if [ -z "$JWT_REFRESH_SECRET" ]; then
+    echo "❌ ERROR: JWT_REFRESH_SECRET environment variable is not set!"
+    echo "Please add JWT_REFRESH_SECRET to Railway Dashboard → Variables"
     exit 1
 fi
 
@@ -20,6 +31,8 @@ fi
 echo "✅ Environment variables checked"
 echo "🔗 Database URL: ${DATABASE_URL}"
 echo "🔌 Port: ${PORT}"
+echo "🔑 JWT_SECRET: [SET]"
+echo "🔑 JWT_REFRESH_SECRET: [SET]"
 
 echo "🔄 Generating Prisma client..."
 npx prisma generate
