@@ -11,33 +11,57 @@
 5. Choose project name: food-delivery-backend
 ```
 
-### 2. Add PostgreSQL Database
+### 2. Add PostgreSQL Database (CRITICAL!)
 ```
 1. In your Railway project dashboard
-2. Click "New Service" → "Database" → "PostgreSQL"
-3. Railway will automatically provide DATABASE_URL
+2. Click "New Service" → "Database" → "PostgreSQL" 
+3. Wait for PostgreSQL to deploy (2-3 minutes)
+4. DATABASE_URL will automatically be available as $DATABASE_URL
 ```
 
 ### 3. Add Redis Cache
 ```
 1. In your Railway project dashboard  
 2. Click "New Service" → "Database" → "Redis"
-3. Railway will automatically provide REDIS_URL
+3. Wait for Redis to deploy (1-2 minutes)
+4. REDIS_URL will automatically be available as $REDIS_URL
 ```
 
 ### 4. Configure Environment Variables
 ```
-Go to your app service → Variables tab
-Copy variables from .env.railway file
-Important: Change JWT secrets to strong values!
+Go to your APP service (not database) → Variables tab
+Add these variables EXACTLY as shown:
+
+NODE_ENV=production
+PORT=$PORT
+DATABASE_URL=$DATABASE_URL
+REDIS_URL=$REDIS_URL
+JWT_SECRET=your-strong-secret-here-change-this
+JWT_EXPIRES_IN=1d
+JWT_REFRESH_SECRET=your-strong-refresh-secret-here-change-this
+JWT_REFRESH_EXPIRES_IN=7d
+TOTP_WINDOW=1
+TOTP_STEP=30
+TOTP_ISSUER=Food Delivery App
+THROTTLE_TTL=60
+THROTTLE_LIMIT=100
+PRISMA_CLI_BINARY_TARGETS=linux-musl
 ```
 
 ### 5. Deploy Settings
 ```
-Service Settings:
+Service Settings (automatically detected):
 - Build Method: Dockerfile
-- Health Check: /api/v1
+- Health Check: /health  
 - Port: $PORT (Railway auto-assigns)
+```
+
+### ⚠️ CRITICAL: Service Order
+```
+1. First: Create PostgreSQL service ✅
+2. Second: Create Redis service ✅  
+3. Third: Deploy your app service ✅
+4. Fourth: Set environment variables ✅
 ```
 
 ## Environment Variables for Railway
