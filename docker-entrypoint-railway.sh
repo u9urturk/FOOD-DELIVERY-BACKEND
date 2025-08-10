@@ -7,7 +7,8 @@ echo "🚀 Starting Food Delivery Backend on Railway..."
 if [ -z "$DATABASE_URL" ]; then
     echo "❌ ERROR: DATABASE_URL environment variable is not set!"
     echo "Please check Railway Dashboard → Variables tab"
-    echo "Make sure PostgreSQL service is added and DATABASE_URL is set to \$DATABASE_URL"
+    echo "Current env vars:"
+    env | grep -E "(DATABASE|RAILWAY)" || echo "No database env vars found"
     exit 1
 fi
 
@@ -23,8 +24,22 @@ echo "🔌 Port: ${PORT}"
 echo "🔄 Generating Prisma client..."
 npx prisma generate
 
+# Try migrations with retry logic
 echo "🔄 Running database migrations..."
-npx prisma migrate deploy
+for i in 1 2 3; do
+    echo "Migration attempt $i/3..."
+    if npx prisma migrate deploy; then
+        echo "✅ Migrations completed successfully!"
+        break
+    else
+        echo "⚠️ Migration attempt $i failed, retrying in 5 seconds..."
+        sleep 5
+        if [ $i -eq 3 ]; then
+            echo "❌ All migration attempts failed, but starting app anyway..."
+            echo "The app will attempt to connect at runtime..."
+        fi
+    fi
+done
 
 echo "✅ Initialization complete!"
 

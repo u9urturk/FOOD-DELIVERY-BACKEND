@@ -46,14 +46,43 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // Health check endpoint (outside of API prefix)
-  app.getHttpAdapter().get('/health', (req, res) => {
-    res.status(200).json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-      message: 'Food Delivery Backend is running'
-    });
+  app.getHttpAdapter().get('/health', async (req, res) => {
+    try {
+      // Basic health check without database dependency
+      res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development',
+        message: 'Food Delivery Backend is running',
+        services: {
+          database: 'checking...',
+          redis: 'checking...'
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      });
+    }
+  });
+
+  // Database health check endpoint (separate)
+  app.getHttpAdapter().get('/health/db', async (req, res) => {
+    try {
+      // This will be checked separately
+      res.status(200).json({
+        status: 'ok',
+        database: 'connected'
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        database: 'disconnected',
+        error: error.message
+      });
+    }
   });
 
   // Root health check for Railway

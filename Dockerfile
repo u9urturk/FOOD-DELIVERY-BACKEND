@@ -68,16 +68,16 @@ USER nestjs
 # Expose port (Railway will assign the port via $PORT)
 EXPOSE 3000
 
-# Health check for Railway
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD node -e "const http = require('http'); \
-    const options = { host: '0.0.0.0', port: process.env.PORT || 3000, path: '/health', timeout: 5000 }; \
-    const req = http.request(options, (res) => { \
-      if (res.statusCode === 200) process.exit(0); \
-      else process.exit(1); \
-    }); \
-    req.on('error', () => process.exit(1)); \
-    req.end();"
+# Health check disabled for Railway (Railway handles its own health checks)
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+#   CMD node -e "const http = require('http'); \
+#     const options = { host: '0.0.0.0', port: process.env.PORT || 3000, path: '/health', timeout: 5000 }; \
+#     const req = http.request(options, (res) => { \
+#       if (res.statusCode === 200) process.exit(0); \
+#       else process.exit(1); \
+#     }); \
+#     req.on('error', () => process.exit(1)); \
+#     req.end();"
 
 # Start the application with Railway entrypoint
 ENTRYPOINT ["./docker-entrypoint-railway.sh"]
