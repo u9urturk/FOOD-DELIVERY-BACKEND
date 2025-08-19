@@ -12,14 +12,15 @@ WORKDIR /app
 
 # Install build dependencies
 RUN apk add --no-cache libc6-compat
+# pnpm'ı yükle
+RUN npm install -g pnpm
 
 # Copy package files
 COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install dependencies (including dev dependencies for build)
-RUN npm ci --frozen-lockfile
-
+RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
@@ -30,7 +31,7 @@ RUN npx prisma generate
 RUN npm run build && npx tsc prisma/seed.ts --outDir dist/prisma --module commonjs --target es2023 --moduleResolution node --esModuleInterop true --allowSyntheticDefaultImports true --experimentalDecorators true --emitDecoratorMetadata true
 
 # Remove dev dependencies
-RUN npm ci --frozen-lockfile --only=production && npm cache clean --force
+RUN pnpm install --frozen-lockfile --prod && pnpm cache clean --force
 
 # ==========================================
 # Production Stage
