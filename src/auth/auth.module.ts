@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
@@ -12,6 +12,9 @@ import { RolesModule } from './roles/roles.module';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { RateLimitGuard } from 'src/common/guards/rate-limit.guard';
 import { ErrorService } from '../common/services/error.service';
+import { ProfileModule } from 'src/modules/profile/profile.module';
+import { CsrfService } from './csrf.service';
+import { TokenService } from './token.service';
 
 @Module({
   imports: [
@@ -19,16 +22,18 @@ import { ErrorService } from '../common/services/error.service';
     RedisModule,
     RolesModule,
     PassportModule,
+    forwardRef(() => ProfileModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1d' },
+        signOptions: { expiresIn: configService.get<string>('ACCESS_TOKEN_TTL') || configService.get<string>('JWT_EXPIRES_IN') || '10m' },
       }),
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, OtpService, JwtStrategy, RateLimitGuard, RolesGuard, ErrorService],
+  providers: [AuthService, OtpService, JwtStrategy, RateLimitGuard, RolesGuard, ErrorService, CsrfService, TokenService],
   controllers: [AuthController],
+  exports: [OtpService],
 })
 export class AuthModule { }

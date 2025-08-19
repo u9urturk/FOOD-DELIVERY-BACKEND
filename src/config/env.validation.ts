@@ -280,6 +280,18 @@ class EnvironmentVariables {
   @Transform(({ value }) => parseInt(value, 10))
   @IsOptional()
   PRISMA_STUDIO_PORT?: number = 5555;
+
+  // ===========================================
+  // Cookie / Auth (Cookie Only Mode) Configuration
+  // ===========================================
+  @IsString()
+  @IsOptional()
+  COOKIE_DOMAIN?: string; // Örn: .example.com (opsiyonel)
+
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true')
+  @IsOptional()
+  CROSS_SITE_COOKIES?: boolean = false; // true ise SameSite=None + Secure
 }
 
 export function validate(config: Record<string, unknown>) {

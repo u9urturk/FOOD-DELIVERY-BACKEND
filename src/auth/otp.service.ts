@@ -6,8 +6,8 @@ import * as QRCode from 'qrcode';
 export class OtpService {
   generateSecret(username: string) {
     return speakeasy.generateSecret({
-      name: `MyApp (${username})`,
-      issuer: 'MyApp',
+      name: `Trend Restoran (${username})`,
+      issuer: 'Trend Restoran',
       length: 32,
     });
   }

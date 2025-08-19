@@ -5,7 +5,7 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 
 @Injectable()
 export class RolesService {
-  constructor(private prisma: DatabaseService) {}
+  constructor(private prisma: DatabaseService) { }
 
   async create(createRoleDto: CreateRoleDto) {
     const { name, description, permissionIds } = createRoleDto;
@@ -16,10 +16,10 @@ export class RolesService {
         description,
         rolePermissions: permissionIds
           ? {
-              create: permissionIds.map((permissionId) => ({
-                permissionId: permissionId,
-              })),
-            }
+            create: permissionIds.map((permissionId) => ({
+              permissionId: permissionId,
+            })),
+          }
           : undefined,
       },
     });
@@ -27,13 +27,7 @@ export class RolesService {
 
   async findAll() {
     return this.prisma.role.findMany({
-      include: {
-        rolePermissions: {
-          include: {
-            permission: true,
-          },
-        },
-      },
+
     });
   }
 
@@ -66,10 +60,10 @@ export class RolesService {
         description,
         rolePermissions: permissionIds
           ? {
-              create: permissionIds.map((permissionId) => ({
-                permissionId: permissionId,
-              })),
-            }
+            create: permissionIds.map((permissionId) => ({
+              permissionId: permissionId,
+            })),
+          }
           : undefined,
       },
     });
@@ -78,6 +72,21 @@ export class RolesService {
   async remove(id: string) {
     return this.prisma.role.delete({
       where: { id },
+    });
+  }
+
+
+  async UpdateRoleToUser(userId: string, oldRoleId: string, newRoleId: string) {
+    return this.prisma.userRole.update({
+      where: {
+        userId_roleId: {
+          userId,
+          roleId: oldRoleId,
+        }
+      },
+      data: {
+        roleId: newRoleId,
+      },
     });
   }
 

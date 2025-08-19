@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards} from '@nestjs/common';
 import { PermissionsService } from './permissions.service';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CreatePermissionDto } from './dto/create-permission.dto';
@@ -24,7 +24,6 @@ export class PermissionsController {
     status: 403, 
     description: 'Forbidden. Requires ADMIN role.' 
   })
-  @ApiBearerAuth('JWT-auth')
   @Roles('ADMIN')
   @Post()
   create(@Body() createPermissionDto: CreatePermissionDto) {
@@ -41,7 +40,6 @@ export class PermissionsController {
     status: 403, 
     description: 'Forbidden. Requires ADMIN or MANAGER role.' 
   })
-  @ApiBearerAuth('JWT-auth')
   @Roles('ADMIN', 'MANAGER')
   @Get()
   findAll() {
@@ -62,7 +60,6 @@ export class PermissionsController {
     status: 403, 
     description: 'Forbidden. Requires ADMIN or MANAGER role.' 
   })
-  @ApiBearerAuth('JWT-auth')
   @Roles('ADMIN', 'MANAGER')
   @Get(':id')
   findOne(@Param('id') id: string) {
@@ -83,7 +80,6 @@ export class PermissionsController {
     status: 403, 
     description: 'Forbidden. Requires ADMIN role.' 
   })
-  @ApiBearerAuth('JWT-auth')
   @Roles('ADMIN')
   @Patch(':id')
   update(@Param('id') id: string, @Body() updatePermissionDto: UpdatePermissionDto) {
@@ -103,7 +99,6 @@ export class PermissionsController {
     status: 403, 
     description: 'Forbidden. Requires ADMIN role.' 
   })
-  @ApiBearerAuth('JWT-auth')
   @Roles('ADMIN')
   @Delete(':id')
   remove(@Param('id') id: string) {

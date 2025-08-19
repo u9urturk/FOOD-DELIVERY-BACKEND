@@ -3,10 +3,25 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { setupSwagger } from './swagger/swagger.config';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { networkInterfaces } from 'os';
+
+function getLocalNetworkIP() {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      // IPv4 ve localhost olmayan adresi seç
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return 'localhost';
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,16 +31,19 @@ async function bootstrap() {
   app.use(helmet());
   app.use(compression());
 
+  // Cookie parser for refresh token cookie
+  app.use(cookieParser());
+
   // CORS
   const allowedOrigins = process.env.NODE_ENV === 'production'
     ? (process.env.FRONTEND_URL || '').split(',').filter(url => url.trim())
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4200'];
+    : [ 'http://localhost:5173', 'http://localhost:4200','http://192.168.1.42:5173','http://192.168.1.52:5173'];
 
   app.enableCors({
     origin: allowedOrigins.length > 0 ? allowedOrigins : true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Set-Cookie'],
   });
 
   // Global pipes
@@ -101,9 +119,11 @@ async function bootstrap() {
   const port = configService.get('PORT', 3000);
   await app.listen(port, '0.0.0.0');
 
-  // console.log(`🚀 Application is running on: http://localhost:${port}`);
-  // console.log(`🌐 Network access: http://192.168.1.38:${port}`);
-  // console.log(`📚 Swagger documentation: http://localhost:${port}/docs`);
+  const localIP = getLocalNetworkIP();
+
+  console.log(`🚀 Application is running locally:  http://localhost:${port}`);
+  console.log(`🌐 Network access:               http://${localIP}:${port}`);
+  console.log(`📚 Swagger documentation:        http://localhost:${port}/docs`);
 }
 
 bootstrap();

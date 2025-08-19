@@ -11,10 +11,12 @@ import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import { validate } from './config/env.validation';
+import { ProfileModule } from './modules/profile/profile.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ 
+    ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig, jwtConfig],
       // validate, // Temporarily disabled for testing
@@ -22,10 +24,12 @@ import { validate } from './config/env.validation';
       expandVariables: true,
     }),
     CommonModule,
-    AuthModule,
+    AuthModule, 
     RolesModule,
     PermissionsModule,
-    RedisModule
+    RedisModule,
+    ProfileModule,
+    RealtimeModule
   ],
   controllers: [AppController],
   providers: [AppService],

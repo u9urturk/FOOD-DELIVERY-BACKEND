@@ -13,11 +13,35 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   username     String   @unique
+  name         String?
+  surname      String?
   otpSecret    String?
   otpEnabled   Boolean  @default(false)
   recoveryCode String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // Profile / Security Extensions
+  email                 String?   @unique
+  passwordHash          String?
+  locale                String?   @default("tr-TR")
+  timeZone              String?   @default("UTC")
+  theme                 String?   @default("light")
+  density               String?   @default("comfortable")
+  notificationEmail     Boolean   @default(true)
+  notificationPush      Boolean   @default(true)
+  lastLoginAt           DateTime?
+  lastPasswordChangeAt  DateTime?
+  failedMfaAttempts     Int       @default(0)
+  mfaLockedUntil        DateTime?
+  avatarUrl             String?
+  pendingEmail          String?
+  pendingEmailToken     String?
+  deletedAt             DateTime?
+
+  // Relations (profile related)
+  sessions       Session[]
+  activityLogs   UserActivityLog[]
 
   orders          Order[]
   stockMovements  StockMovement[]
@@ -25,6 +49,58 @@ model User {
   userRoles UserRole[]
 
   @@map("users")
+}
+
+// Session management for refresh tokens / device sessions
+model Session {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  // refreshTokenHash moved to RefreshToken model to support rotation and history
+  userAgent        String?
+  ip               String?
+  createdAt        DateTime @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  revokedReason    String?
+  // relation to refresh tokens
+  refreshTokens    RefreshToken[]
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// Refresh tokens table - stores token hashes and rotation history
+model RefreshToken {
+  id           String   @id @default(cuid())
+  sessionId    String
+  session      Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokenHash    String
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime?
+  replacedBy   String?  // references RefreshToken.id if needed in app logic
+  revokedAt    DateTime?
+  revokedReason String?
+  ip           String?
+  userAgent    String?
+
+  @@index([tokenHash], name: "idx_refresh_token_hash")
+  @@map("refresh_tokens")
+}
+
+// User activity / audit logging
+model UserActivityLog {
+  id         String             @id @default(cuid())
+  userId     String?
+  user       User?              @relation(fields: [userId], references: [id])
+  action     UserActivityAction
+  context    Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime           @default(now())
+
+  @@index([userId, createdAt])
+  @@map("user_activity_logs")
 }
 
 model Role {
@@ -455,4 +531,17 @@ enum NotificationPriority {
   MEDIUM
   HIGH
   URGENT
+}
+
+// User activity actions enum for audit logging
+enum UserActivityAction {
+  PROFILE_UPDATE
+  PASSWORD_CHANGE
+  MFA_ENABLED
+  MFA_DISABLED
+  SESSION_REVOKE
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  EMAIL_CHANGE_REQUEST
+  EMAIL_CHANGE_CONFIRM
 }

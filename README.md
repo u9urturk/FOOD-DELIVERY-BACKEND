@@ -1,5 +1,3 @@
-# FOOD-DELIVERY-BACKEND
-=======
 # 🍔 Food Delivery Backend API
 
 A comprehensive backend service for food delivery applications built with NestJS, featuring robust authentication, order management, real-time operations, and containerized deployment.
@@ -7,11 +5,12 @@ A comprehensive backend service for food delivery applications built with NestJS
 ## ✨ Features
 
 ### 🔐 Authentication & Security
-- **Google Authenticator TOTP**: Secure username-based authentication with QR code setup
-- **JWT Token Management**: Access & refresh token system
-- **Role-based Authorization**: Admin, Staff, Customer roles
-- **Rate Limiting**: Protection against API abuse
-- **Input Validation**: Comprehensive request validation
+- **Google Authenticator TOTP**: Güvenli QR kurulumlu OTP
+- **Cookie-Only Auth**: HttpOnly `access_token` (kısa ömür) + döndürülen / rotasyonlu `refresh_token` (bileşik `<sessionId>.<random>`) – body'de token dönülmez
+- **Refresh Token Rotation & Reuse Detection**: Oturum çalınma / token reuse tespiti ve iptal
+- **Role-based Authorization**: ADMIN / MANAGER / USER rol kontrolü
+- **Rate Limiting**: Brute force azaltma
+- **Central Error Handling & Validation**: Tutarlı hata yanıtları
 
 ### 📱 Core Functionality
 - **User Management**: Profile creation and management
@@ -168,7 +167,10 @@ After successfully starting the application:
 | POST | `/auth/register` | Register with username | ❌ |
 | POST | `/auth/login` | Login with username & TOTP token | ❌ |
 | POST | `/auth/login-recovery` | Login with recovery code | ❌ |
-| POST | `/auth/profile` | Get user profile | ✅ |
+| POST | `/auth/profile` (kalacaksa) veya `/profile/me` | Get current user | ✅ |
+| POST | `/auth/refresh` | Rotate refresh & issue new access | ✅ (refresh cookie) |
+| POST | `/auth/logout` | Revoke current session | ✅ |
+| GET  | `/auth/csrf` | (Opsiyonel) CSRF token üret | ❌ |
 
 ### Request/Response Examples
 
@@ -193,7 +195,7 @@ Content-Type: application/json
 }
 ```
 
-#### Login with TOTP Token
+#### Login with TOTP Token (Cookie-Only)
 ```bash
 POST /api/v1/auth/login
 Content-Type: application/json
@@ -203,19 +205,21 @@ Content-Type: application/json
   "token": "123456"
 }
 
-# Response:
+# Response (body örneği):
 {
   "success": true,
-  "message": "Login successful",
   "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": {
-      "userId": 1,
-      "username": "john_doe",
-      "roles": ["USER"]
-    }
-  }
+    "message": "Giriş başarılı",
+    "session_id": "ckz...",
+    "refresh_expires_at": "2025-08-25T18:10:52.000Z"
+  },
+  "timestamp": "2025-08-18T18:10:52.123Z"
 }
+
+# Önemli: Access & refresh token'lar Set-Cookie header'larında gelir:
+# Set-Cookie:
+#  access_token=...; HttpOnly; SameSite=Strict; Path=/
+#  refresh_token=<sessionId>.<random>; HttpOnly; SameSite=Strict; Path=/
 ```
 
 #### Login with Recovery Code
@@ -231,27 +235,49 @@ Content-Type: application/json
 # Response: Same as login response
 ```
 
-#### Get Profile
+#### Get Profile (Cookie ile)
 ```bash
-POST /api/v1/auth/profile
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+GET /api/v1/profile/me  (veya mevcut POST /auth/profile)
+# Tarayıcı/istemci otomatik olarak HttpOnly access_token cookie gönderir.
+# Authorization header gerekmez.
 
-# Response:
+# Örnek Response:
 {
-  "userId": 1,
-  "username": "john_doe",
-  "roles": ["USER", "MANAGER"]
+  "success": true,
+  "data": {
+    "userId": "ckz...",
+    "username": "john_doe",
+    "roles": ["USER"]
+  },
+  "timestamp": "2025-08-18T18:12:10.000Z"
 }
 ```
 
+#### Refresh Tokens
+```bash
+POST /api/v1/auth/refresh
+# Body boş (refresh_token cookie'den okunur)
+# Response body yine access token içermez; Set-Cookie ile yeni access & rotated refresh gönderilir.
+```
+
+#### Logout
+```bash
+POST /api/v1/auth/logout
+# Mevcut session revoke edilir; access_token & refresh_token cookie'leri maxAge=0 ile temizlenir.
+```
+
+#### CSRF (Cross-Site Senaryolar İçin)
+`CROSS_SITE_COOKIES=true` olduğunda SameSite=None kullanılır ve CSRF koruması için frontend:
+1. `GET /api/v1/auth/csrf` -> `csrf_token` (HttpOnly olmayan) cookie + JSON `{ csrfToken }`
+2. Mutasyon isteklerinde header: `X-CSRF-Token: <csrfToken>`
+
 ## 🗄️ Database Schema
 
-### Core Tables
-
-#### Users & Authentication
-- `users` - User information
-- `totp_secrets` - Google Authenticator secrets
-- `tokens` - JWT tokens
+### Core Tables (Auth İlgili)
+- `users` - Kullanıcı
+- `sessions` - Cihaz / oturum kaydı (refresh yaşam süresi)
+- `refresh_tokens` - Hash'lenmiş refresh token rotasyon geçmişi
+- `user_activity_logs` - Güvenlik / denetim logları
 
 #### Restaurant Operations
 - `menu_categories` - Menu categories
@@ -310,11 +336,14 @@ REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_PASSWORD=redis123
 
-# JWT Configuration
+# JWT & Cookie Auth Configuration
 JWT_SECRET="your-jwt-secret-key-here"
-JWT_EXPIRES_IN="1d"
-JWT_REFRESH_SECRET="your-refresh-secret-key-here"
-JWT_REFRESH_EXPIRES_IN="7d"
+JWT_EXPIRES_IN="600s"              # Access token kısa ömür
+JWT_REFRESH_SECRET="your-refresh-secret-key-here"  # (Legacy gerekirse)
+ACCESS_TOKEN_TTL="600s"             # Opsiyonel override
+REFRESH_TOKEN_TTL_DAYS=7
+COOKIE_DOMAIN=".localhost"          # Prod: .example.com (opsiyonel)
+CROSS_SITE_COOKIES=false             # true => SameSite=None; Secure
 
 # OTP Configuration (Google Authenticator)
 TOTP_WINDOW=1
@@ -338,11 +367,12 @@ DATABASE_URL="postgresql://username:password@host:port/database"
 # Redis (Production)
 REDIS_URL="redis://username:password@host:port/0"
 
-# JWT Configuration (Use strong secrets)
-JWT_SECRET="production-jwt-secret"
-JWT_EXPIRES_IN="1d"
-JWT_REFRESH_SECRET="production-refresh-secret"
-JWT_REFRESH_EXPIRES_IN="7d"
+# JWT / Auth (Prod)
+JWT_SECRET="production-jwt-secret"        # 32+ char
+ACCESS_TOKEN_TTL="600s"
+REFRESH_TOKEN_TTL_DAYS=7
+COOKIE_DOMAIN=".yourdomain.com"
+CROSS_SITE_COOKIES=true                   # SPA farklı origin ise
 
 # Security
 THROTTLE_TTL=60
@@ -574,12 +604,14 @@ npx prisma migrate dev && npm run start:dev
 open http://localhost:3000/api/docs
 ```
 
-### 🔐 Authentication Flow:
-1. **Register**: POST `/auth/register` with username, get QR code & backup codes
-2. **Setup**: Scan QR code with Google Authenticator app
-3. **Login**: POST `/auth/login` with username & 6-digit token from app
-4. **Recovery**: POST `/auth/login-recovery` with username & backup recovery code
-5. **Profile**: POST `/auth/profile` to get user info (requires JWT token)
+### 🔐 Authentication Flow (Cookie-Only)
+1. **Register**: `POST /auth/register` kullanıcı adı ile (OTP secret + QR + recovery code döner)
+2. **First Login**: `POST /auth/login` (username + TOTP) -> access_token & refresh_token HttpOnly cookie'lerde
+3. **Subsequent Requests**: Access cookie otomatik gönderilir
+4. **Refresh**: Access süresi dolduğunda `POST /auth/refresh` (body boş)
+5. **Recovery**: TOTP kilitli ise `POST /auth/login-recovery`
+6. **Logout**: `POST /auth/logout` -> oturum revoke + cookie temizleme
+7. **CSRF (opsiyonel)**: Cross-site ise `GET /auth/csrf` + `X-CSRF-Token` header
 
 **Happy Coding! 🎉**
 >>>>>>> 00aec65 (First Commit)

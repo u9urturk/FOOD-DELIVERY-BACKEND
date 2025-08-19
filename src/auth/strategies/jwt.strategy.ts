@@ -3,12 +3,14 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from 'src/database/database.service';
+import { LoggingService } from 'src/common/services/logging.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     configService: ConfigService,
     private prisma: DatabaseService,
+    private logger: LoggingService,
   ) {
     const jwtSecret = configService.get<string>('JWT_SECRET');
     
@@ -17,14 +19,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: (req) => {
+        // Cookie-only access token
+        if (req?.cookies?.access_token) return req.cookies.access_token;
+        return null; // Authorization header desteklenmiyor
+      },
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
     });
   }
 
   async validate(payload: any) {
-    const user = await this.prisma.user.findUnique({
+  const prismaAny: any = this.prisma;
+  const user = await prismaAny.user.findUnique({
       where: { id: payload.sub },
       include: {
         userRoles: {
@@ -36,16 +43,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user) {
+      this.logger.logSecurityEvent('invalid_token', { userId: payload.sub });
       throw new Error('User not found');
     }
 
     // Extract role names
     const roles = user.userRoles.map((userRole) => userRole.role.name);
 
+    const sessionId = payload.sid;
+    // Minimal risk log (low volume): başarılı doğrulama sadece debug seviyesinde
+    this.logger.logDebug('JWT validate success', { userId: user.id, sessionId }, 'JwtStrategy');
     return {
       userId: user.id,
       username: user.username,
       roles,
+      sessionId,
     };
   }
 }

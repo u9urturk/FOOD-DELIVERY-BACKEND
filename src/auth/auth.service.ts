@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { OtpService } from './otp.service';
-import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '../redis/redis.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -8,21 +7,23 @@ import { RecoveryDto } from './dto/recovery.dto';
 import { DatabaseService } from 'src/database/database.service';
 import { RolesService } from './roles/roles.service';
 import { ErrorService } from '../common/services/error.service';
+import { SessionService } from 'src/modules/profile/session/session.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: DatabaseService,
     private otpService: OtpService,
-    private jwtService: JwtService,
     private redisService: RedisService,
     private rolesService: RolesService,
     private errorService: ErrorService,
+    private sessionService: SessionService,
   ) { }
 
   async register(registerDto: RegisterDto) {
     try {
       const { username } = registerDto;
+
 
       // Check if user exists
       const existingUser = await this.prisma.user.findUnique({
@@ -72,9 +73,10 @@ export class AuthService {
     }
   }
 
-  async login(loginDto: LoginDto, ip: string) {
+  async login(loginDto: LoginDto, ip: string, userAgent?: string) {
     try {
       const { username, token } = loginDto;
+
 
       // Check rate limiting
       await this.checkRateLimit(ip);
@@ -126,20 +128,25 @@ export class AuthService {
       // Extract role names
       const roles = user.userRoles.map((userRole) => userRole.role.name);
 
-      // Generate JWT
+      // Generate JWT + create session (refresh token)
       const payload = { sub: user.id, username: user.username, roles };
+      const session = await this.sessionService.generateAndStore({ userId: user.id, ip, userAgent });
       return {
         message: 'Giriş başarılı',
-        access_token: this.jwtService.sign(payload),
+        session_id: session.sessionId,
+        refresh_token: session.refreshToken,
+        refresh_expires_at: session.expiresAt,
+        user: { id: user.id, username: user.username, roles },
       };
     } catch (error) {
       this.errorService.handleError(error, 'kullanıcı girişi');
     }
   }
 
-  async loginWithRecoveryCode(recoveryDto: RecoveryDto, ip: string) {
+  async loginWithRecoveryCode(recoveryDto: RecoveryDto, ip: string, userAgent?: string) {
     try {
       const { username, recoveryCode } = recoveryDto;
+
 
       // Check rate limiting
       await this.checkRateLimit(ip);
@@ -174,15 +181,57 @@ export class AuthService {
       // Extract role names
       const roles = user.userRoles.map((userRole) => userRole.role.name);
 
-      // Generate JWT
+      // Generate JWT + session
       const payload = { sub: user.id, username: user.username, roles };
+      const session = await this.sessionService.generateAndStore({ userId: user.id, ip, userAgent });
       return {
         message: 'Kurtarma kodu ile giriş başarılı',
-        access_token: this.jwtService.sign(payload),
+        session_id: session.sessionId,
+        refresh_token: session.refreshToken,
+        refresh_expires_at: session.expiresAt,
         newRecoveryCode,
+        user: { id: user.id, username: user.username, roles },
       };
     } catch (error) {
       this.errorService.handleError(error, 'kurtarma kodu ile giriş');
+    }
+  }
+
+  async refreshTokensFromCookie(compositeToken: string | undefined, ip: string) {
+    try {
+      if (!compositeToken) this.errorService.throwInvalidToken();
+      if (!compositeToken.includes('.')) this.errorService.throwInvalidToken();
+      const [sessionId] = compositeToken.split('.', 2);
+      const session = await this.prisma.session.findUnique({ where: { id: sessionId } });
+      if (!session) this.errorService.throwNotFound('Oturum');
+      const userId = session.userId;
+      const rotated = await this.sessionService.verifyAndRotate(userId, sessionId, compositeToken);
+      // fetch user for roles
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { userRoles: { include: { role: true } } },
+      });
+      if (!user) this.errorService.throwUserNotFound();
+      const roles = user.userRoles.map((ur) => ur.role.name);
+      const payload = { sub: user.id, username: user.username, roles };
+      return {
+        message: 'Token yenilendi',
+        rotated_refresh_token: rotated.refreshToken,
+        refresh_expires_at: rotated.expiresAt,
+        session_id: sessionId,
+        user: { id: user.id, username: user.username, roles },
+      };
+    } catch (error) {
+      this.errorService.handleError(error, 'refresh token yenileme');
+    }
+  }
+
+  async logout(userId: string, sessionId: string) {
+    try {
+      if (!sessionId) this.errorService.throwNotFound('Oturum');
+      return await this.sessionService.revoke(userId, sessionId, 'logout');
+    } catch (error) {
+      this.errorService.handleError(error, 'çıkış yapma');
     }
   }
 
