@@ -31,17 +31,81 @@ CREATE TYPE "public"."NotificationType" AS ENUM ('ORDER', 'PAYMENT', 'STOCK', 'S
 -- CreateEnum
 CREATE TYPE "public"."NotificationPriority" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'URGENT');
 
+-- CreateEnum
+CREATE TYPE "public"."UserActivityAction" AS ENUM ('PROFILE_UPDATE', 'PASSWORD_CHANGE', 'MFA_ENABLED', 'MFA_DISABLED', 'SESSION_REVOKE', 'LOGIN_SUCCESS', 'LOGIN_FAILURE', 'EMAIL_CHANGE_REQUEST', 'EMAIL_CHANGE_CONFIRM');
+
 -- CreateTable
 CREATE TABLE "public"."users" (
     "id" TEXT NOT NULL,
     "username" TEXT NOT NULL,
+    "name" TEXT,
+    "surname" TEXT,
     "otpSecret" TEXT,
     "otpEnabled" BOOLEAN NOT NULL DEFAULT false,
     "recoveryCode" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "email" TEXT,
+    "passwordHash" TEXT,
+    "locale" TEXT DEFAULT 'tr-TR',
+    "timeZone" TEXT DEFAULT 'UTC',
+    "theme" TEXT DEFAULT 'light',
+    "density" TEXT DEFAULT 'comfortable',
+    "notificationEmail" BOOLEAN NOT NULL DEFAULT true,
+    "notificationPush" BOOLEAN NOT NULL DEFAULT true,
+    "lastLoginAt" TIMESTAMP(3),
+    "lastPasswordChangeAt" TIMESTAMP(3),
+    "failedMfaAttempts" INTEGER NOT NULL DEFAULT 0,
+    "mfaLockedUntil" TIMESTAMP(3),
+    "avatarUrl" TEXT,
+    "pendingEmail" TEXT,
+    "pendingEmailToken" TEXT,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."sessions" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "userAgent" TEXT,
+    "ip" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "revokedReason" TEXT,
+
+    CONSTRAINT "sessions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."refresh_tokens" (
+    "id" TEXT NOT NULL,
+    "sessionId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3),
+    "replacedBy" TEXT,
+    "revokedAt" TIMESTAMP(3),
+    "revokedReason" TEXT,
+    "ip" TEXT,
+    "userAgent" TEXT,
+
+    CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."user_activity_logs" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT,
+    "action" "public"."UserActivityAction" NOT NULL,
+    "context" JSONB,
+    "ip" TEXT,
+    "userAgent" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_activity_logs_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -335,6 +399,18 @@ CREATE TABLE "public"."notifications" (
 CREATE UNIQUE INDEX "users_username_key" ON "public"."users"("username");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "users_email_key" ON "public"."users"("email");
+
+-- CreateIndex
+CREATE INDEX "sessions_userId_idx" ON "public"."sessions"("userId");
+
+-- CreateIndex
+CREATE INDEX "idx_refresh_token_hash" ON "public"."refresh_tokens"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "user_activity_logs_userId_createdAt_idx" ON "public"."user_activity_logs"("userId", "createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "roles_name_key" ON "public"."roles"("name");
 
 -- CreateIndex
@@ -357,6 +433,15 @@ CREATE UNIQUE INDEX "revenue_data_date_period_key" ON "public"."revenue_data"("d
 
 -- CreateIndex
 CREATE UNIQUE INDEX "dashboard_stats_date_key" ON "public"."dashboard_stats"("date");
+
+-- AddForeignKey
+ALTER TABLE "public"."sessions" ADD CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."refresh_tokens" ADD CONSTRAINT "refresh_tokens_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "public"."sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."user_activity_logs" ADD CONSTRAINT "user_activity_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."user_roles" ADD CONSTRAINT "user_roles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
