@@ -1,5 +1,6 @@
 // src/auth/auth.controller.ts
 import { Controller, Post, Body, Req, UseGuards, Get } from '@nestjs/common';
+import { CsrfGuard } from 'src/common/guards/csrf.guard';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -21,8 +22,8 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ status: 201, description: 'User successfully registered.' })
-  @ApiResponse({ 
-    status: 409, 
+  @ApiResponse({
+    status: 409,
     description: 'Username already exists.',
     type: ErrorResponseDto,
     example: {
@@ -36,10 +37,10 @@ export class AuthController {
       requestId: 'req_123456789'
     }
   })
-  @ApiResponse({ 
-    status: 400, 
+  @ApiResponse({
+    status: 400,
     description: 'Bad Request.',
-    type: ErrorResponseDto 
+    type: ErrorResponseDto
   })
   @Post('register')
   async register(@Body() registerDto: RegisterDto) {
@@ -48,8 +49,8 @@ export class AuthController {
 
   @ApiOperation({ summary: 'User login with OTP' })
   @ApiResponse({ status: 200, description: 'User successfully logged in.', type: AuthResponseDto })
-  @ApiResponse({ 
-    status: 401, 
+  @ApiResponse({
+    status: 401,
     description: 'Invalid credentials.',
     type: ErrorResponseDto,
     example: {
@@ -63,22 +64,22 @@ export class AuthController {
       requestId: 'req_123456789'
     }
   })
-  @ApiResponse({ 
-    status: 404, 
+  @ApiResponse({
+    status: 404,
     description: 'User not found.',
-    type: ErrorResponseDto 
+    type: ErrorResponseDto
   })
-  @ApiResponse({ 
-    status: 429, 
+  @ApiResponse({
+    status: 429,
     description: 'Too many requests.',
-    type: ErrorResponseDto 
+    type: ErrorResponseDto
   })
-  @UseGuards(RateLimitGuard)
+  @UseGuards(RateLimitGuard, CsrfGuard)
   @Post('login')
   async login(@Body() loginDto: LoginDto, @Req() req: any) {
     const userAgent = req.headers?.['user-agent'] || req.get?.('User-Agent') || 'unknown';
     const result = await this.authService.login(loginDto, req.ip, userAgent);
-  // access token artık controller içinde TokenService ile üretilecek (aşağıda)
+    // access token artık controller içinde TokenService ile üretilecek (aşağıda)
     const { refresh_token, user, session_id } = result as any;
     if (refresh_token) this.setRefreshCookie(req, refresh_token, result.refresh_expires_at);
     if (user && session_id) {
@@ -96,7 +97,7 @@ export class AuthController {
     description: 'Profile retrieved successfully.',
     type: ProfileResponseDto
   }) @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @UseGuards(RateLimitGuard)
+  @UseGuards(RateLimitGuard, CsrfGuard)
   @Post('login-recovery')
   async loginWithRecoveryCode(@Body() recoveryDto: RecoveryDto, @Req() req: any) {
     const userAgent = req.headers?.['user-agent'] || req.get?.('User-Agent') || 'unknown';
@@ -115,11 +116,12 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access & refresh tokens' })
   @ApiResponse({ status: 200, description: 'Tokens refreshed.', type: AuthResponseDto })
   @ApiResponse({ status: 401, description: 'Invalid refresh token.' })
+  @UseGuards(CsrfGuard)
   @Post('refresh')
   async refresh(@Req() req: any) {
     const composite = req.cookies?.refresh_token;
     const result = await this.authService.refreshTokensFromCookie(composite, req.ip);
-  // access token controller içinde TokenService ile üretilecek
+    // access token controller içinde TokenService ile üretilecek
     const { rotated_refresh_token, user, session_id } = result as any;
     if (rotated_refresh_token) this.setRefreshCookie(req, rotated_refresh_token, result.refresh_expires_at);
     if (user && session_id) {
@@ -134,7 +136,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Logout current session' })
   @ApiResponse({ status: 200, description: 'Logged out.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.', type: ErrorResponseDto })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CsrfGuard)
   @Post('logout')
   async logout(@GetUser('userId') userId: string, @GetUser('sessionId') sessionId: string, @Req() req: any) {
     const result = await this.authService.logout(userId, sessionId);
@@ -188,17 +190,18 @@ export class AuthController {
   @Get('csrf')
   getCsrf(@Req() req: any) {
     const token = this.csrf.generateToken();
-    // Non-HttpOnly cookie -> frontend JS okuyabilir
+    // HttpOnly cookie -> frontend JS okuyamaz, backend doğrulama yapacak
     const crossSite = process.env.CROSS_SITE_COOKIES === 'true';
     const sameSite = crossSite ? 'None' : 'Strict';
     req.res.cookie('csrf_token', token, {
-      httpOnly: false,
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production' || crossSite,
       sameSite: sameSite as any,
       path: '/',
       domain: process.env.COOKIE_DOMAIN || undefined,
       maxAge: 60 * 60 * 1000,
     });
-    return { csrfToken: token };
+    // Artık frontend'e token dönmeye gerek yok
+    return { success: true };
   }
 }

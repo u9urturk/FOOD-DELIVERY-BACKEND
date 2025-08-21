@@ -37,13 +37,14 @@ async function bootstrap() {
   // CORS
   const allowedOrigins = process.env.NODE_ENV === 'production'
     ? (process.env.FRONTEND_URL || '').split(',').filter(url => url.trim())
-    : [ 'http://localhost:5173', 'http://localhost:4200','http://192.168.1.42:5173','http://192.168.1.52:5173'];
+    : ['http://localhost:5173', 'http://localhost:4200', 'http://192.168.1.42:5173', 'http://192.168.1.52:5173'];
 
+  // CORS ayarları cross-domain cookie için optimize edildi
   app.enableCors({
     origin: allowedOrigins.length > 0 ? allowedOrigins : true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Set-Cookie'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cookie'],
   });
 
   // Global pipes
