@@ -190,7 +190,6 @@ export class AuthController {
   @Get('csrf')
   getCsrf(@Req() req: any) {
     const token = this.csrf.generateToken();
-    // HttpOnly cookie -> frontend JS okuyamaz, backend doğrulama yapacak
     const crossSite = process.env.CROSS_SITE_COOKIES === 'true';
     const sameSite = crossSite ? 'None' : 'Strict';
     req.res.cookie('csrf_token', token, {
