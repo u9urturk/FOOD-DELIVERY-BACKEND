@@ -164,7 +164,6 @@ export class AuthController {
   }
 
   private parseDurationToMs(input: string, fallback: number): number {
-    // Accept forms like 600, 600s, 10m, 2h, 1d
     if (!input) return fallback;
     const match = /^([0-9]+)([smhd]?)$/i.exec(input.trim());
     if (!match) return fallback;
@@ -200,7 +199,6 @@ export class AuthController {
       domain: process.env.COOKIE_DOMAIN || undefined,
       maxAge: 60 * 60 * 1000,
     });
-    // Artık frontend'e token dönmeye gerek yok
     return { success: true };
   }
 }

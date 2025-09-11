@@ -266,6 +266,25 @@ POST /api/v1/auth/logout
 # Mevcut session revoke edilir; access_token & refresh_token cookie'leri maxAge=0 ile temizlenir.
 ```
 
+### Inventory & Stock (Yeni Modüller)
+
+Bu sürümle birlikte aşağıdaki kaynaklar eklendi. Tüm CRUD uçları Swagger'da mevcuttur.
+
+| Kaynak | Base Path | Örnek İşlemler |
+|---|---|---|
+| Products | `/api/v1/products` | GET /, GET /:id, POST, PUT /:id, DELETE /:id |
+| Categories | `/api/v1/categories` | GET /, POST, ... |
+| Stock Types | `/api/v1/stock-types` | GET /, POST, ... |
+| Base Units | `/api/v1/base-units` | GET /, POST, ... |
+| Warehouses | `/api/v1/warehouses` | GET /, POST, ... |
+| Movement Types | `/api/v1/movement-types` | GET /, POST, ... |
+| Inventory | `/api/v1/inventory` | GET /, POST, ... |
+| Inventory Movements | `/api/v1/inventory-movements` | GET /, POST, ... |
+| Suppliers | `/api/v1/suppliers` | GET /, POST, ... |
+
+Tek seferlik seed (Movement Types): POST `/api/v1/movement-types/seed` ile `[{ name, desc }]` dizisini kabul eder ve toplu ekler (skipDuplicates).
+
+
 #### CSRF (Cross-Site Senaryolar İçin)
 `CROSS_SITE_COOKIES=true` olduğunda SameSite=None kullanılır ve CSRF koruması için frontend:
 1. `GET /api/v1/auth/csrf` -> `csrf_token` (HttpOnly olmayan) cookie + JSON `{ csrfToken }`
@@ -295,6 +314,16 @@ POST /api/v1/auth/logout
 - `stock_items` - Stock items
 - `stock_movements` - Stock movements
 - `suppliers` - Suppliers
+
+#### Inventory Domain (Yeni)
+- `base_units` - Birim temeli (kg, lt, adet vb.)
+- `stock_types` - Stok tipi (tüketilebilir, sarf, vb.)
+- `categories` - Ürün kategori sınıflaması
+- `products` - Ürün kartları (kategori, stok tipi, temel birim ilişkili)
+- `warehouses` - Depo tanımları
+- `movement_types` - Hareket türleri (ör. RECEIPT_PURCHASE, TRANSFER_OUT)
+- `inventories` - Stok seviyeleri (ürün+depo [+tedarikçi ops.])
+- `inventory_movements` - Stok hareket kayıtları (giriş/çıkış/transfer)
 
 #### Analytics
 - `revenue_data` - Revenue data
@@ -378,6 +407,29 @@ CROSS_SITE_COOKIES=true                   # SPA farklı origin ise
 THROTTLE_TTL=60
 THROTTLE_LIMIT=100
 ```
+
+## 📦 Prisma & Migration İpuçları (Önemli)
+
+- Şema değişikliklerinden sonra Prisma Client üretin ve DB şemasını senkronlayın:
+
+```bash
+# Geliştirme (izlenebilir migration)
+npx prisma migrate dev --name your_migration_name
+
+# veya hızlı senkron (dev için)
+npm run prisma:push
+
+# Client üretimi
+npm run prisma:generate
+```
+
+- Mevcut veri tabanında kolon adları snake_case ise, Prisma alanlarını @map("snake_case") ile eşleyin ve ardından generate + migrate/push çalıştırın.
+
+## ✅ Validasyon Notları
+
+- Global ValidationPipe whitelist aktifse, DTO’larda class-validator dekoratörleri yoksa alanlar reddedilir.
+- Bu sürümde Supplier ve Warehouse DTO’larına gerekli dekoratörler eklendi.
+- isActive gibi boolean alanlar form-data/string olarak gelse de dönüştürülür.
 
 ## 🐳 Docker Configuration
 
