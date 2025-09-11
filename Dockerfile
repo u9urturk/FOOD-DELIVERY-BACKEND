@@ -58,7 +58,9 @@ COPY --from=builder /app/prisma ./prisma
 
     # Copy entrypoint scripts
     COPY docker-entrypoint-railway-smart.sh ./
-    RUN chmod +x docker-entrypoint-railway-smart.sh# Change ownership to app user
+    RUN chmod +x docker-entrypoint-railway-smart.sh
+
+# Change ownership to app user
 RUN chown -R nestjs:nodejs /app
 USER nestjs
 
