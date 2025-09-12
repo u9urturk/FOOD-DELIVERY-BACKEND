@@ -51,7 +51,21 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
-  @ApiOperation({ summary: 'User login with OTP' })
+  @ApiOperation({ 
+    summary: 'User login with OTP',
+    description: `
+    🔐 CSRF Korumalı Giriş İşlemi
+    
+    Bu endpoint CSRF koruması altındadır. Kullanım adımları:
+    1. Önce GET /api/v1/auth/csrf endpoint'ini çağırın
+    2. Response'dan 'csrfToken' değerini alın  
+    3. Bu endpoint'e istek yaparken 'X-CSRF-Token' header'ına token'ı ekleyin
+    
+    Swagger'da test etmek için:
+    - Headers bölümünde 'X-CSRF-Token' ekleyin
+    - Value olarak CSRF endpoint'inden aldığınız token'ı girin
+    `
+  })
   @ApiResponse({ status: 200, description: 'User successfully logged in.', type: AuthResponseDto })
   @ApiResponse({
     status: 401,
@@ -66,6 +80,17 @@ export class AuthController {
       error: 'Unauthorized',
       message: 'Geçersiz doğrulama kodu',
       requestId: 'req_123456789'
+    }
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'CSRF token missing or invalid.',
+    type: ErrorResponseDto,
+    example: {
+      success: false,
+      statusCode: 403,
+      error: 'Forbidden',
+      message: 'X-CSRF-Token header\'ı eksik - Header\'da CSRF token göndermelisiniz'
     }
   })
   @ApiResponse({
@@ -217,6 +242,32 @@ export class AuthController {
     }
   }
 
+  @ApiOperation({ 
+    summary: 'Get CSRF token for secure requests',
+    description: `
+    🔒 CSRF Koruması İçin Token Alın
+    
+    Bu endpoint'i çağırdıktan sonra:
+    1. Response'dan 'csrfToken' değerini kopyalayın
+    2. Diğer korumalı endpoint'lerde 'X-CSRF-Token' header'ına bu değeri ekleyin
+    3. Cookie otomatik olarak tarayıcı tarafından gönderilecek
+    
+    Örnek kullanım:
+    - Önce: GET /api/v1/auth/csrf
+    - Sonra: POST /api/v1/auth/login (header: X-CSRF-Token: [token])
+    `
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'CSRF token başarıyla oluşturuldu',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        csrfToken: { type: 'string', example: 'a1b2c3d4e5f6789...' }
+      }
+    }
+  })
   @Get('csrf')
   getCsrf(@Req() req: any) {
     const token = this.csrf.generateToken();
