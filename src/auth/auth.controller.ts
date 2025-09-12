@@ -18,7 +18,11 @@ import { TokenService } from './token.service';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService, private csrf: CsrfService, private tokenService: TokenService) { }
+  constructor(
+    private authService: AuthService, 
+    private csrf: CsrfService, 
+    private tokenService: TokenService
+  ) { }
 
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ status: 201, description: 'User successfully registered.' })
@@ -139,18 +143,39 @@ export class AuthController {
   @UseGuards(JwtAuthGuard, CsrfGuard)
   @Post('logout')
   async logout(@GetUser('userId') userId: string, @GetUser('sessionId') sessionId: string, @Req() req: any) {
-    const result = await this.authService.logout(userId, sessionId);
-    this.clearAuthCookies(req);
-    return result;
+    // Zone.md'ye göre: Güvenli logout işlemi
+    try {
+      const result = await this.authService.logout(userId, sessionId);
+      
+      // CSRF token'ı da iptal et
+      const csrfToken = req.cookies?.csrf_token;
+      if (csrfToken) {
+        this.csrf.revokeToken(csrfToken);
+      }
+      
+      this.clearAuthCookies(req);
+      return result;
+    } catch (error) {
+      // Hata durumunda da cookie'leri temizle
+      this.clearAuthCookies(req);
+      throw error;
+    }
   }
 
   private cookieBaseOptions(maxAgeMs?: number) {
+    // Zone.md'ye göre: Güvenli cookie ayarları
+    const isProduction = process.env.NODE_ENV === 'production';
     const crossSite = process.env.CROSS_SITE_COOKIES === 'true';
+    
+    // Cross-site durumunda SameSite=None ve Secure=true zorunlu
+    // Aynı site durumunda SameSite=Strict daha güvenli
     const sameSite = crossSite ? 'None' : 'Strict';
+    const secure = isProduction || crossSite;
+
     return {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' || crossSite,
-      sameSite: sameSite as any,
+      httpOnly: true, // XSS koruması
+      secure: secure, // HTTPS zorunluluğu
+      sameSite: sameSite as any, // CSRF koruması
       path: '/',
       domain: process.env.COOKIE_DOMAIN || undefined,
       ...(maxAgeMs ? { maxAge: maxAgeMs } : {}),
@@ -158,8 +183,9 @@ export class AuthController {
   }
 
   private setAccessCookie(req: any, token: string) {
-    const raw = process.env.ACCESS_TOKEN_TTL || process.env.JWT_EXPIRES_IN || '600s';
-    const accessMs = this.parseDurationToMs(raw, 600_000); // default 10m
+    // Zone.md'ye göre: Kısa ömürlü access token (5-15 dakika)
+    const raw = process.env.ACCESS_TOKEN_TTL || '900s'; // varsayılan 15 dakika
+    const accessMs = this.parseDurationToMs(raw, 900_000); // default 15m
     req.res.cookie('access_token', token, { ...this.cookieBaseOptions(accessMs) });
   }
 
@@ -181,24 +207,37 @@ export class AuthController {
   private clearAuthCookies(req: any) {
     try {
       const base = this.cookieBaseOptions(0);
+      // Tüm auth-related cookie'leri temizle
       req.res.cookie('access_token', '', { ...base, maxAge: 0 });
       req.res.cookie('refresh_token', '', { ...base, maxAge: 0 });
-    } catch (e) { /* ignore */ }
+      req.res.cookie('csrf_token', '', { ...base, maxAge: 0 });
+    } catch (e) { 
+      // Cookie temizleme hatası loglanabilir ama işlemi durdurmaz
+      console.warn('Cookie temizleme hatası:', e.message);
+    }
   }
 
   @Get('csrf')
   getCsrf(@Req() req: any) {
     const token = this.csrf.generateToken();
     const crossSite = process.env.CROSS_SITE_COOKIES === 'true';
+    const isProduction = process.env.NODE_ENV === 'production';
     const sameSite = crossSite ? 'None' : 'Strict';
+    
+    // Zone.md'ye göre: CSRF token hem cookie hem response'da gönderilmeli
     req.res.cookie('csrf_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' || crossSite,
+      httpOnly: false, // Frontend'in erişebilmesi için HttpOnly=false
+      secure: isProduction || crossSite,
       sameSite: sameSite as any,
       path: '/',
       domain: process.env.COOKIE_DOMAIN || undefined,
-      maxAge: 60 * 60 * 1000,
+      maxAge: 60 * 60 * 1000, // 1 saat
     });
-    return { success: true };
+    
+    // Token'ı response'da da gönder (double submit cookie pattern)
+    return { 
+      success: true, 
+      csrfToken: token // Frontend bu token'ı header'da gönderecek
+    };
   }
 }
