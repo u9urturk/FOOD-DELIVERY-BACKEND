@@ -59,23 +59,57 @@ async function bootstrap() {
     ? (process.env.FRONTEND_URL || '').split(',').filter(url => url.trim())
     : ['http://localhost:5173', 'http://localhost:4200', 'http://192.168.1.42:5173', 'http://192.168.1.52:5173'];
 
-  // Zone.md'ye göre: Güvenli CORS ayarları
+  console.log('🌐 CORS Configuration:');
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+  console.log('Allowed Origins:', allowedOrigins);
+
+  // Zone.md'ye göre: Güvenli CORS ayarları (Railway uyumlu)
   app.enableCors({
     origin: (origin, callback) => {
-      // Production'da sadece belirlenen origin'lere izin ver
-      if (process.env.NODE_ENV === 'production') {
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error('CORS policy violation'), false);
-        }
+      console.log('🔍 Origin Check:', origin);
+      
+      // Development modunda daha esnek
+      if (process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+        return;
+      }
+
+      // Self-origin (Swagger UI için)
+      const selfOrigin = `https://${process.env.RAILWAY_PUBLIC_DOMAIN || process.env.HOST || 'localhost'}`;
+      console.log('🏠 Self Origin:', selfOrigin);
+
+      // Production'da origin kontrolü
+      if (!origin) {
+        // Postman, mobile app gibi origin'i olmayan istekler
+        callback(null, true);
+        return;
+      }
+
+      // Self-origin kontrolü (Swagger için)
+      if (origin === selfOrigin || 
+          origin.includes(process.env.RAILWAY_PUBLIC_DOMAIN || '') ||
+          origin.includes('railway.app')) {
+        console.log('✅ Self-origin allowed:', origin);
+        callback(null, true);
+        return;
+      }
+
+      // Allowed origins kontrolü
+      if (allowedOrigins.length === 0) {
+        // FRONTEND_URL tanımlı değilse geçici olarak izin ver (güvenlik uyarısı)
+        console.warn('⚠️  FRONTEND_URL tanımlı değil, tüm origin\'lere izin veriliyor!');
+        callback(null, true);
+        return;
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
       } else {
-        // Development'da daha esnek ama güvenli
-        if (!origin || allowedOrigins.some(allowed => origin.startsWith(allowed.split(':')[0] + ':' + allowed.split(':')[1]))) {
-          callback(null, true);
-        } else {
-          callback(new Error('CORS policy violation'), false);
-        }
+        console.error('❌ CORS violation for origin:', origin);
+        console.error('Expected one of:', allowedOrigins);
+        console.error('Or self-origin:', selfOrigin);
+        callback(new Error('CORS policy violation'), false);
       }
     },
     credentials: true, // HttpOnly cookie'ler için zorunlu
@@ -159,6 +193,26 @@ async function bootstrap() {
       status: 'ok',
       message: 'Food Delivery Backend API',
       documentation: '/api/docs'
+    });
+  });
+
+  // Debug endpoint for CORS troubleshooting (Railway)
+  app.getHttpAdapter().get('/debug/cors', (req, res) => {
+    const selfOrigin = `https://${process.env.RAILWAY_PUBLIC_DOMAIN || process.env.HOST || 'localhost'}`;
+    res.status(200).json({
+      environment: process.env.NODE_ENV,
+      frontendUrl: process.env.FRONTEND_URL,
+      allowedOrigins: allowedOrigins,
+      requestOrigin: req.headers.origin,
+      selfOrigin: selfOrigin,
+      railwayDomain: process.env.RAILWAY_PUBLIC_DOMAIN,
+      host: process.env.HOST,
+      headers: {
+        origin: req.headers.origin,
+        referer: req.headers.referer,
+        host: req.headers.host
+      },
+      timestamp: new Date().toISOString()
     });
   });
 
