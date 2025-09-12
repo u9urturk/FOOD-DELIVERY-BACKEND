@@ -27,21 +27,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
-  // Security middleware - Safari compatible
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        connectSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:"],
-        fontSrc: ["'self'", "data:"],
-        frameSrc: ["'none'"]
-      }
-    },
-    crossOriginEmbedderPolicy: false, // Safari compatibility
-  }));
+  // Security middleware
+  app.use(helmet());
   app.use(compression());
 
   // Cookie parser for refresh token cookie
@@ -52,30 +39,12 @@ async function bootstrap() {
     ? (process.env.FRONTEND_URL || '').split(',').filter(url => url.trim())
     : ['http://localhost:5173', 'http://localhost:4200', 'http://192.168.1.42:5173', 'http://192.168.1.52:5173'];
 
-  // CORS ayarları Safari ve cross-domain cookie için optimize edildi
+  // CORS ayarları cross-domain cookie için optimize edildi
   app.enableCors({
-    origin: function(origin, callback) {
-      // Safari için özel origin handling
-      if (!origin) return callback(null, true); // Mobile apps ve Postman için
-      
-      const isAllowed = allowedOrigins.length > 0 
-        ? allowedOrigins.some(allowed => origin.startsWith(allowed))
-        : true;
-      
-      callback(null, isAllowed);
-    },
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
-      'Accept', 
-      'Cookie',
-      'X-Requested-With',
-      'X-CSRF-Token',
-    ],
-    exposedHeaders: ['Set-Cookie'],
-    maxAge: 86400, // Safari için preflight cache
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cookie'],
   });
 
   // Global pipes
@@ -145,27 +114,6 @@ async function bootstrap() {
       status: 'ok',
       message: 'Food Delivery Backend API',
       documentation: '/api/docs'
-    });
-  });
-
-  // Safari debug endpoint
-  app.getHttpAdapter().get('/debug/safari', (req, res) => {
-    const isSafari = /Safari/.test(req.headers['user-agent'] || '') && !/Chrome/.test(req.headers['user-agent'] || '');
-    
-    res.status(200).json({
-      isSafari,
-      userAgent: req.headers['user-agent'],
-      cookies: req.headers.cookie,
-      origin: req.headers.origin,
-      referer: req.headers.referer,
-      csrfCookie: req.cookies?.csrf_token,
-      csrfHeaderToken: req.cookies?.csrf_header_token,
-      headers: {
-        'x-csrf-token': req.headers['x-csrf-token'],
-        'content-type': req.headers['content-type'],
-        'accept': req.headers.accept
-      },
-      timestamp: new Date().toISOString()
     });
   });
 

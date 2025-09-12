@@ -6,28 +6,14 @@ export class CsrfGuard implements CanActivate {
         const request = context.switchToHttp().getRequest();
         const csrfCookie = request.cookies?.csrf_token;
         const csrfHeader = request.headers['x-csrf-token'];
-        const userAgent = request.headers['user-agent'] || '';
-        
-        // Safari detection
-        const isSafari = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
-        
-        // HttpOnly cookie kontrolü (her zaman gerekli)
+
+        // HttpOnly cookie olduğundan, frontend header gönderemez. Sadece cookie kontrolü yapılır.
         if (!csrfCookie) {
-            throw new ForbiddenException('CSRF token eksik - cookie bulunamadı');
+            throw new ForbiddenException('CSRF token eksik');
         }
 
-        // Safari için: header token da kontrol et
-        if (isSafari) {
-            if (!csrfHeader) {
-                throw new ForbiddenException('CSRF token eksik - Safari için header gerekli');
-            }
-            
-            // Token eşleşmesi kontrolü
-            if (csrfHeader !== csrfCookie) {
-                throw new ForbiddenException('CSRF token uyumsuzluğu');
-            }
-        }
-
+        // İsteğe bağlı: Token doğrulama mantığı eklenebilir (örneğin, Redis ile eşleşme, expiry vs.)
+        // Şimdilik sadece varlığını kontrol ediyoruz.
         return true;
     }
 }

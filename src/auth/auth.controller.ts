@@ -188,56 +188,17 @@ export class AuthController {
 
   @Get('csrf')
   getCsrf(@Req() req: any) {
-    try {
-      const token = this.csrf.generateToken();
-      
-      // CORS headers için explicit setting
-      req.res.header('Access-Control-Allow-Origin', req.headers.origin);
-      req.res.header('Access-Control-Allow-Credentials', 'true');
-      req.res.header('Content-Type', 'application/json');
-      
-      // Safari için multiple cookie setting
-      req.res.cookie('csrf_header_token', token, {
-        httpOnly: false, // Safari için önemli!
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax', // Safari compatibility
-        maxAge: 300000, // 5 minutes
-        path: '/'
-      });
-      
-      // Alternative cookie names
-      req.res.cookie('XSRF-TOKEN', token, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 300000,
-        path: '/'
-      });
-      
-      // Main CSRF cookie
-      req.res.cookie('csrf_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 300000,
-      });
-      
-      // JSON response (önemli!)
-      return {
-        success: true,
-        csrfToken: token,
-        token: token,
-        _token: token
-      };
-      
-    } catch (error) {
-      console.error('CSRF endpoint error:', error);
-      req.res.status(500);
-      return {
-        success: false,
-        message: 'Failed to generate CSRF token'
-      };
-    }
+    const token = this.csrf.generateToken();
+    const crossSite = process.env.CROSS_SITE_COOKIES === 'true';
+    const sameSite = crossSite ? 'None' : 'Strict';
+    req.res.cookie('csrf_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' || crossSite,
+      sameSite: sameSite as any,
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || undefined,
+      maxAge: 60 * 60 * 1000,
+    });
+    return { success: true };
   }
 }
