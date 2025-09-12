@@ -73,7 +73,6 @@ async function bootstrap() {
       'Cookie',
       'X-Requested-With',
       'X-CSRF-Token',
-      'Cache-Control'
     ],
     exposedHeaders: ['Set-Cookie'],
     maxAge: 86400, // Safari için preflight cache

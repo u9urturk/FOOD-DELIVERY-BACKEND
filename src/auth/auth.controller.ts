@@ -189,14 +189,12 @@ export class AuthController {
   @Get('csrf')
   getCsrf(@Req() req: any) {
     const token = this.csrf.generateToken();
-    const crossSite = process.env.CROSS_SITE_COOKIES === 'true';
-    const sameSite = crossSite ? 'None' : 'Strict';
     
     // Safari için: HttpOnly cookie + response body token
     req.res.cookie('csrf_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' || crossSite,
-      sameSite: sameSite as any,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax', // Safari uyumluluğu için lax
       path: '/',
       domain: process.env.COOKIE_DOMAIN || undefined,
       maxAge: 60 * 60 * 1000,
@@ -205,8 +203,8 @@ export class AuthController {
     // Safari için: Frontend'de kullanabilecek non-httpOnly token
     req.res.cookie('csrf_header_token', token, {
       httpOnly: false, // Frontend erişebilir
-      secure: process.env.NODE_ENV === 'production' || crossSite,
-      sameSite: sameSite as any,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax', // Safari uyumluluğu için lax
       path: '/',
       domain: process.env.COOKIE_DOMAIN || undefined,
       maxAge: 60 * 60 * 1000,
