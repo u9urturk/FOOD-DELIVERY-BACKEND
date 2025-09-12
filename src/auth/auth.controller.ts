@@ -191,6 +191,8 @@ export class AuthController {
     const token = this.csrf.generateToken();
     const crossSite = process.env.CROSS_SITE_COOKIES === 'true';
     const sameSite = crossSite ? 'None' : 'Strict';
+    
+    // Safari için: HttpOnly cookie + response body token
     req.res.cookie('csrf_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' || crossSite,
@@ -199,6 +201,21 @@ export class AuthController {
       domain: process.env.COOKIE_DOMAIN || undefined,
       maxAge: 60 * 60 * 1000,
     });
-    return { success: true };
+    
+    // Safari için: Frontend'de kullanabilecek non-httpOnly token
+    req.res.cookie('csrf_header_token', token, {
+      httpOnly: false, // Frontend erişebilir
+      secure: process.env.NODE_ENV === 'production' || crossSite,
+      sameSite: sameSite as any,
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || undefined,
+      maxAge: 60 * 60 * 1000,
+    });
+    
+    return { 
+      success: true, 
+      csrfToken: token, // Safari frontend için
+      timestamp: new Date().toISOString()
+    };
   }
 }

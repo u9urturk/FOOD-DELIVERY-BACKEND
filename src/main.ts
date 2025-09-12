@@ -151,12 +151,21 @@ async function bootstrap() {
 
   // Safari debug endpoint
   app.getHttpAdapter().get('/debug/safari', (req, res) => {
+    const isSafari = /Safari/.test(req.headers['user-agent'] || '') && !/Chrome/.test(req.headers['user-agent'] || '');
+    
     res.status(200).json({
+      isSafari,
       userAgent: req.headers['user-agent'],
       cookies: req.headers.cookie,
       origin: req.headers.origin,
       referer: req.headers.referer,
-      headers: req.headers,
+      csrfCookie: req.cookies?.csrf_token,
+      csrfHeaderToken: req.cookies?.csrf_header_token,
+      headers: {
+        'x-csrf-token': req.headers['x-csrf-token'],
+        'content-type': req.headers['content-type'],
+        'accept': req.headers.accept
+      },
       timestamp: new Date().toISOString()
     });
   });
