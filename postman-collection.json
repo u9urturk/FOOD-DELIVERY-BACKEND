@@ -1,0 +1,193 @@
+{
+  "info": {
+    "name": "Food Delivery Backend - CSRF Security Test",
+    "description": "Backend güvenlik akışını test etmek için Postman collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://your-app.railway.app",
+      "description": "Railway deployment URL'inizi buraya girin"
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "description": "CSRF endpoint'inden alınacak token"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Get CSRF Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// CSRF token'ı otomatik olarak variable'a kaydet",
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.collectionVariables.set('csrfToken', response.csrfToken);",
+              "    console.log('CSRF Token set:', response.csrfToken);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/csrf",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "csrf"]
+        },
+        "description": "CSRF token alır ve otomatik olarak variable'a kaydeder"
+      }
+    },
+    {
+      "name": "2. Login (CSRF Protected)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}",
+            "description": "Otomatik olarak set edilen CSRF token"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"usernameOrEmail\": \"test@example.com\",\n  \"otpCode\": \"123456\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "description": "CSRF korumalı login işlemi"
+      }
+    },
+    {
+      "name": "3. Get Profile (JWT Protected)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/profile",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "profile"]
+        },
+        "description": "JWT korumalı profil bilgileri (CSRF gerekmez)"
+      }
+    },
+    {
+      "name": "4. Refresh Tokens (CSRF Protected)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Refresh öncesi yeni CSRF token al",
+              "pm.sendRequest({",
+              "    url: pm.collectionVariables.get('baseUrl') + '/api/v1/auth/csrf',",
+              "    method: 'GET'",
+              "}, function (err, res) {",
+              "    if (err) {",
+              "        console.log(err);",
+              "    } else {",
+              "        const response = res.json();",
+              "        pm.collectionVariables.set('csrfToken', response.csrfToken);",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/refresh",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "refresh"]
+        },
+        "description": "Token refresh işlemi (otomatik CSRF token yenileme ile)"
+      }
+    },
+    {
+      "name": "5. Logout (CSRF Protected)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Logout öncesi yeni CSRF token al",
+              "pm.sendRequest({",
+              "    url: pm.collectionVariables.get('baseUrl') + '/api/v1/auth/csrf',",
+              "    method: 'GET'",
+              "}, function (err, res) {",
+              "    if (err) {",
+              "        console.log(err);",
+              "    } else {",
+              "        const response = res.json();",
+              "        pm.collectionVariables.set('csrfToken', response.csrfToken);",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "logout"]
+        },
+        "description": "Güvenli logout işlemi"
+      }
+    },
+    {
+      "name": "Debug - CORS Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/debug/cors",
+          "host": ["{{baseUrl}}"],
+          "path": ["debug", "cors"]
+        },
+        "description": "CORS ve environment bilgileri"
+      }
+    }
+  ]
+}

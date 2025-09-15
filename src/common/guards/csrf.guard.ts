@@ -8,7 +8,7 @@ export class CsrfGuard implements CanActivate {
     canActivate(context: ExecutionContext): boolean {
         const request = context.switchToHttp().getRequest();
         const csrfCookie = request.cookies?.csrf_token;
-        const csrfHeader = request.headers['x-csrf-token'];
+        const csrfHeader = request.headers['X-CSRF-Token'];
 
         console.log('🔒 CSRF Guard - Cookie:', csrfCookie ? 'Present' : 'Missing');
         console.log('� CSRF Guard - Header:', csrfHeader ? 'Present' : 'Missing');

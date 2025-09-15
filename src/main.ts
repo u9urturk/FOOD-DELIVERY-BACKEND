@@ -68,7 +68,7 @@ async function bootstrap() {
   app.enableCors({
     origin: (origin, callback) => {
       console.log('🔍 Origin Check:', origin);
-      
+
       // Development modunda daha esnek
       if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
@@ -87,9 +87,9 @@ async function bootstrap() {
       }
 
       // Self-origin kontrolü (Swagger için)
-      if (origin === selfOrigin || 
-          origin.includes(process.env.RAILWAY_PUBLIC_DOMAIN || '') ||
-          origin.includes('railway.app')) {
+      if (origin === selfOrigin ||
+        origin.includes(process.env.RAILWAY_PUBLIC_DOMAIN || '') ||
+        origin.includes('railway.app')) {
         console.log('✅ Self-origin allowed:', origin);
         callback(null, true);
         return;
@@ -115,9 +115,9 @@ async function bootstrap() {
     credentials: true, // HttpOnly cookie'ler için zorunlu
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
-      'Accept', 
+      'Content-Type',
+      'Authorization',
+      'Accept',
       'Cookie',
       'X-CSRF-Token', // CSRF token için
       'X-Requested-With' // AJAX request tanımlama için
