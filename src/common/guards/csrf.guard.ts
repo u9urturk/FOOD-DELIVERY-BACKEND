@@ -3,13 +3,13 @@ import { CsrfService } from '../../auth/csrf.service';
 
 @Injectable()
 export class CsrfGuard implements CanActivate {
-    constructor(private readonly csrfService: CsrfService) {}
+    constructor(private readonly csrfService: CsrfService) { }
 
     canActivate(context: ExecutionContext): boolean {
         const request = context.switchToHttp().getRequest();
         const csrfCookie = request.cookies?.csrf_token;
-        const csrfHeader = request.headers['X-CSRF-Token'];
-
+        const csrfHeader = request.headers['x-csrf-token'];
+        console.log(request.headers['x-csrf-token'])
         console.log('🔒 CSRF Guard - Cookie:', csrfCookie ? 'Present' : 'Missing');
         console.log('� CSRF Guard - Header:', csrfHeader ? 'Present' : 'Missing');
         console.log('🔒 CSRF Guard - User-Agent:', request.headers['user-agent']);
