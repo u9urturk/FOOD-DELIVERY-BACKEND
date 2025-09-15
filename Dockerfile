@@ -10,27 +10,25 @@ FROM node:20-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache libc6-compat
+# Install pnpm and build dependencies
+RUN apk add --no-cache libc6-compat && \
+    npm install -g pnpm
 
 # Copy package files
-COPY package*.json ./
+COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma/
 
 # Install dependencies (including dev dependencies for build)
-RUN npm ci --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
-
 # Build the application and compile seed
-RUN npm run build && npx tsc prisma/seed.ts --outDir dist/prisma --module commonjs --target es2023 --moduleResolution node --esModuleInterop true --allowSyntheticDefaultImports true --experimentalDecorators true --emitDecoratorMetadata true
+RUN pnpm run build && npx prisma generate && npx tsc prisma/seed.ts --outDir dist/prisma --module commonjs --target es2023 --moduleResolution node --esModuleInterop true --allowSyntheticDefaultImports true --experimentalDecorators true --emitDecoratorMetadata true
 
 # Remove dev dependencies
-RUN npm ci --frozen-lockfile --only=production && npm cache clean --force
+RUN pnpm prune --prod
 
 # ==========================================
 # Production Stage
@@ -49,7 +47,7 @@ RUN adduser -S nestjs -u 1001
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json pnpm-lock.yaml ./
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
