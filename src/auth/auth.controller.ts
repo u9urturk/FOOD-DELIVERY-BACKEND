@@ -7,7 +7,7 @@ import { LoginDto } from './dto/login.dto';
 import { RecoveryDto } from './dto/recovery.dto';
 import { RateLimitGuard } from 'src/common/guards/rate-limit.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiHeader } from '@nestjs/swagger';
 import { ProfileResponseDto } from './dto/profile-response.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { ErrorResponseDto } from '../common/dto/response.dto';
@@ -66,6 +66,12 @@ export class AuthController {
     - Value olarak CSRF endpoint'inden aldığınız token'ı girin
     `
   })
+  @ApiHeader({
+    name: 'X-CSRF-Token',
+    description: 'CSRF token (GET /api/v1/auth/csrf endpoint\'inden alın)',
+    required: true,
+    example: 'a1b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef'
+  })
   @ApiResponse({ status: 200, description: 'User successfully logged in.', type: AuthResponseDto })
   @ApiResponse({
     status: 401,
@@ -121,6 +127,11 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'User login with recovery code' })
+  @ApiHeader({
+    name: 'X-CSRF-Token',
+    description: 'CSRF token (GET /api/v1/auth/csrf endpoint\'inden alın)',
+    required: true
+  })
   @ApiResponse({
     status: 200,
     description: 'Profile retrieved successfully.',
@@ -143,6 +154,11 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Refresh access & refresh tokens' })
+  @ApiHeader({
+    name: 'X-CSRF-Token',
+    description: 'CSRF token (GET /api/v1/auth/csrf endpoint\'inden alın)',
+    required: true
+  })
   @ApiResponse({ status: 200, description: 'Tokens refreshed.', type: AuthResponseDto })
   @ApiResponse({ status: 401, description: 'Invalid refresh token.' })
   @UseGuards(CsrfGuard)
@@ -163,6 +179,11 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Logout current session' })
+  @ApiHeader({
+    name: 'X-CSRF-Token',
+    description: 'CSRF token (GET /api/v1/auth/csrf endpoint\'inden alın)',
+    required: true
+  })
   @ApiResponse({ status: 200, description: 'Logged out.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.', type: ErrorResponseDto })
   @UseGuards(JwtAuthGuard, CsrfGuard)
