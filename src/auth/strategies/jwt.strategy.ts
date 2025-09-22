@@ -19,11 +19,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     super({
-      jwtFromRequest: (req) => {
-        // Cookie-only access token
-        if (req?.cookies?.access_token) return req.cookies.access_token;
-        return null; // Authorization header desteklenmiyor
-      },
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
     });
@@ -51,13 +47,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const roles = user.userRoles.map((userRole) => userRole.role.name);
 
     const sessionId = payload.sid;
-    // Minimal risk log (low volume): başarılı doğrulama sadece debug seviyesinde
     this.logger.logDebug('JWT validate success', { userId: user.id, sessionId }, 'JwtStrategy');
     return {
       userId: user.id,
       username: user.username,
       roles,
       sessionId,
+      jti: payload.jti,
+      exp: payload.exp,
     };
   }
 }

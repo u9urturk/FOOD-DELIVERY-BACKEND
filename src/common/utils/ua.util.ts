@@ -9,7 +9,6 @@ export interface ParsedUA {
 export function parseUserAgent(ua: string): ParsedUA {
   if (!ua) return {};
   try {
-    // Some type bundles of ua-parser-js don't expose constructor, cast to any
     const parser = new (UAParser as any)(ua);
     const b = parser.getBrowser?.() || {};
     const o = parser.getOS?.() || {};

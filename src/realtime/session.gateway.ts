@@ -1,7 +1,7 @@
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { SessionEventsService } from './session-events.service.js';
+import { SessionEventsService } from './session-events.service';
 import { LoggingService } from 'src/common/services/logging.service';
 import { UnauthorizedException } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';

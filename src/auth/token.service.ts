@@ -2,13 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
 export interface AccessTokenPayload {
-  sub: string; // user id
+  sub: string; 
   username: string;
   roles: string[];
-  sid: string; // session id
-  iat?: number; // issued at
-  exp?: number; // expires at
-  jti?: string; // jwt id (token rotation için)
+  sid: string; 
+  iat?: number; 
+  exp?: number; 
+  jti?: string; 
 }
 
 @Injectable()
@@ -18,18 +18,16 @@ export class TokenService {
   buildPayload(params: { userId: string; username: string; roles: string[]; sessionId: string }): AccessTokenPayload {
     const { userId, username, roles, sessionId } = params;
     
-    // Zone.md'ye göre: Token payload güvenliği
     return { 
       sub: userId, 
       username, 
-      roles: roles || [], // Boş array varsayılan
+      roles: roles || [],
       sid: sessionId,
-      jti: this.generateJti(), // Token rotation için
+      jti: this.generateJti(), 
     };
   }
 
   signAccessToken(payload: AccessTokenPayload): string {
-    // Zone.md'ye göre: Kısa ömürlü access token
     const expiresIn = process.env.ACCESS_TOKEN_TTL || '15m';
     
     return this.jwt.sign(payload, {
@@ -52,7 +50,6 @@ export class TokenService {
   }
 
   private generateJti(): string {
-    // JWT ID için güvenli rastgele string
     return require('crypto').randomBytes(16).toString('hex');
   }
 }

@@ -1,26 +1,23 @@
-// src/auth/auth.controller.ts
-import { Controller, Post, Body, Req, UseGuards, Get } from '@nestjs/common';
-import { CsrfGuard } from 'src/common/guards/csrf.guard';
+import { Controller, Post, Body, Req, UseGuards, Get, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RecoveryDto } from './dto/recovery.dto';
 import { RateLimitGuard } from 'src/common/guards/rate-limit.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { ApiOperation, ApiResponse, ApiTags, ApiHeader } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
 import { ProfileResponseDto } from './dto/profile-response.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { ErrorResponseDto } from '../common/dto/response.dto';
 import { GetUser } from 'src/common/decorators/get-user.decorator';
-import { CsrfService } from './csrf.service';
 import { TokenService } from './token.service';
+import { BlacklistGuard } from 'src/common/guards/black-list.guard';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(
-    private authService: AuthService, 
-    private csrf: CsrfService, 
+    private authService: AuthService,
     private tokenService: TokenService
   ) { }
 
@@ -51,265 +48,128 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
-  @ApiOperation({ 
-    summary: 'User login with OTP',
-    description: `
-    🔐 CSRF Korumalı Giriş İşlemi
-    
-    Bu endpoint CSRF koruması altındadır. Kullanım adımları:
-    1. Önce GET /api/v1/auth/csrf endpoint'ini çağırın
-    2. Response'dan 'csrfToken' değerini alın  
-    3. Bu endpoint'e istek yaparken 'X-CSRF-Token' header'ına token'ı ekleyin
-    
-    Swagger'da test etmek için:
-    - Headers bölümünde 'X-CSRF-Token' ekleyin
-    - Value olarak CSRF endpoint'inden aldığınız token'ı girin
-    `
-  })
-  @ApiHeader({
-    name: 'X-CSRF-Token',
-    description: 'CSRF token (GET /api/v1/auth/csrf endpoint\'inden alın)',
-    required: true,
-    example: 'a1b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef'
-  })
+  @ApiOperation({ summary: 'User login with OTP', description: 'Modern Access/Refresh token + Bearer mimarisi ile giriş.' })
   @ApiResponse({ status: 200, description: 'User successfully logged in.', type: AuthResponseDto })
-  @ApiResponse({
-    status: 401,
-    description: 'Invalid credentials.',
-    type: ErrorResponseDto,
-    example: {
-      success: false,
-      timestamp: '2024-08-07T10:30:00.000Z',
-      path: '/auth/login',
-      method: 'POST',
-      statusCode: 401,
-      error: 'Unauthorized',
-      message: 'Geçersiz doğrulama kodu',
-      requestId: 'req_123456789'
-    }
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'CSRF token missing or invalid.',
-    type: ErrorResponseDto,
-    example: {
-      success: false,
-      statusCode: 403,
-      error: 'Forbidden',
-      message: 'X-CSRF-Token header\'ı eksik - Header\'da CSRF token göndermelisiniz'
-    }
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'User not found.',
-    type: ErrorResponseDto
-  })
-  @ApiResponse({
-    status: 429,
-    description: 'Too many requests.',
-    type: ErrorResponseDto
-  })
-  @UseGuards(RateLimitGuard, CsrfGuard)
+  @ApiResponse({ status: 401, description: 'Invalid credentials.', type: ErrorResponseDto })
+  @ApiResponse({ status: 404, description: 'User not found.', type: ErrorResponseDto })
+  @ApiResponse({ status: 429, description: 'Too many requests.', type: ErrorResponseDto })
+  @UseGuards(RateLimitGuard)
   @Post('login')
-  async login(@Body() loginDto: LoginDto, @Req() req: any) {
+  async login(@Body() loginDto: LoginDto, @Req() req: any, @Res({ passthrough: true }) res: any) {
+
     const userAgent = req.headers?.['user-agent'] || req.get?.('User-Agent') || 'unknown';
     const result = await this.authService.login(loginDto, req.ip, userAgent);
-    // access token artık controller içinde TokenService ile üretilecek (aşağıda)
     const { refresh_token, user, session_id } = result as any;
-    if (refresh_token) this.setRefreshCookie(req, refresh_token, result.refresh_expires_at);
+
+    if (refresh_token) this.setRefreshCookie(res, refresh_token, result.refresh_expires_at);
+
+    const { user: _u, refresh_token: _r, ...rest } = result as any;
+
     if (user && session_id) {
       const payload = this.tokenService.buildPayload({ userId: user.id, username: user.username, roles: user.roles, sessionId: session_id });
       const signed = this.tokenService.signAccessToken(payload);
-      this.setAccessCookie(req, signed);
+      return { ...rest, access_token: signed };
     }
-    const { user: _u, refresh_token: _r, ...rest } = result as any;
     return { ...rest };
   }
 
   @ApiOperation({ summary: 'User login with recovery code' })
-  @ApiHeader({
-    name: 'X-CSRF-Token',
-    description: 'CSRF token (GET /api/v1/auth/csrf endpoint\'inden alın)',
-    required: true
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Profile retrieved successfully.',
-    type: ProfileResponseDto
-  }) @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @UseGuards(RateLimitGuard, CsrfGuard)
+  @ApiResponse({ status: 200, description: 'Profile retrieved successfully.', type: ProfileResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @UseGuards(RateLimitGuard)
   @Post('login-recovery')
-  async loginWithRecoveryCode(@Body() recoveryDto: RecoveryDto, @Req() req: any) {
+  async loginWithRecoveryCode(@Body() recoveryDto: RecoveryDto, @Req() req: any, @Res({ passthrough: true }) res: any) {
     const userAgent = req.headers?.['user-agent'] || req.get?.('User-Agent') || 'unknown';
-    return this.authService.loginWithRecoveryCode(recoveryDto, req.ip, userAgent);
+    const result = await this.authService.loginWithRecoveryCode(recoveryDto, req.ip, userAgent);
+    const { refresh_token, user, session_id } = result as any;
+    if (refresh_token) this.setRefreshCookie(res, refresh_token, result.refresh_expires_at);
+    if (user && session_id) {
+      const payload = this.tokenService.buildPayload({ userId: user.id, username: user.username, roles: user.roles, sessionId: session_id });
+      const signed = this.tokenService.signAccessToken(payload);
+      return { ...result, access_token: signed };
+    }
+    return result;
   }
 
   @ApiOperation({ summary: 'Get user profile' })
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, BlacklistGuard)
   @Post('profile')
   getProfile(@Req() req: any): ProfileResponseDto {
     return req.user;
   }
 
   @ApiOperation({ summary: 'Refresh access & refresh tokens' })
-  @ApiHeader({
-    name: 'X-CSRF-Token',
-    description: 'CSRF token (GET /api/v1/auth/csrf endpoint\'inden alın)',
-    required: true
-  })
   @ApiResponse({ status: 200, description: 'Tokens refreshed.', type: AuthResponseDto })
   @ApiResponse({ status: 401, description: 'Invalid refresh token.' })
-  @UseGuards(CsrfGuard)
   @Post('refresh')
-  async refresh(@Req() req: any) {
+  async refresh(@Req() req: any, @Res({ passthrough: true }) res: any) {
     const composite = req.cookies?.refresh_token;
     const result = await this.authService.refreshTokensFromCookie(composite, req.ip);
-    // access token controller içinde TokenService ile üretilecek
     const { rotated_refresh_token, user, session_id } = result as any;
-    if (rotated_refresh_token) this.setRefreshCookie(req, rotated_refresh_token, result.refresh_expires_at);
+    if (rotated_refresh_token) this.setRefreshCookie(res, rotated_refresh_token, result.refresh_expires_at);
     if (user && session_id) {
       const payload = this.tokenService.buildPayload({ userId: user.id, username: user.username, roles: user.roles, sessionId: session_id });
       const signed = this.tokenService.signAccessToken(payload);
-      this.setAccessCookie(req, signed);
+      return { ...result, access_token: signed };
     }
-    const { user: _u, rotated_refresh_token: _rr, ...rest } = result as any;
-    return { ...rest };
+    return result;
   }
 
   @ApiOperation({ summary: 'Logout current session' })
-  @ApiHeader({
-    name: 'X-CSRF-Token',
-    description: 'CSRF token (GET /api/v1/auth/csrf endpoint\'inden alın)',
-    required: true
-  })
   @ApiResponse({ status: 200, description: 'Logged out.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.', type: ErrorResponseDto })
-  @UseGuards(JwtAuthGuard, CsrfGuard)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, BlacklistGuard)
   @Post('logout')
-  async logout(@GetUser('userId') userId: string, @GetUser('sessionId') sessionId: string, @Req() req: any) {
-    // Zone.md'ye göre: Güvenli logout işlemi
+  async logout(@GetUser('userId') userId: string,
+    @GetUser('jti') jti: string,
+    @GetUser('sessionId') sessionId: string,
+    @GetUser('exp') exp: number,
+    @Req() req: any, @Res({ passthrough: true }) res: any) {
     try {
-      const result = await this.authService.logout(userId, sessionId);
-      
-      // CSRF token'ı da iptal et
-      const csrfToken = req.cookies?.csrf_token;
-      if (csrfToken) {
-        this.csrf.revokeToken(csrfToken);
-      }
-      
-      this.clearAuthCookies(req);
+      const result = await this.authService.logout(userId, sessionId, jti, exp);
+      this.clearAuthCookies(res);
       return result;
     } catch (error) {
-      // Hata durumunda da cookie'leri temizle
-      this.clearAuthCookies(req);
+      this.clearAuthCookies(res);
       throw error;
     }
   }
 
   private cookieBaseOptions(maxAgeMs?: number) {
-    // Zone.md'ye göre: Güvenli cookie ayarları
-    const isProduction = process.env.NODE_ENV === 'production';
     const crossSite = process.env.CROSS_SITE_COOKIES === 'true';
-    
-    // Cross-site durumunda SameSite=None ve Secure=true zorunlu
-    // Aynı site durumunda SameSite=Strict daha güvenli
-    const sameSite = crossSite ? 'None' : 'Strict';
+    const isProduction = process.env.NODE_ENV === 'production';
     const secure = isProduction || crossSite;
+    const sameSite = (crossSite ? 'None' : 'Lax') as any;
+
+    const configuredDomain = process.env.COOKIE_DOMAIN || undefined;
+    const lower = configuredDomain?.toLowerCase();
+    const isLocalDomain = !configuredDomain || ['localhost', '127.0.0.1', '::1'].includes(lower || '');
+    const domain = isLocalDomain ? undefined : configuredDomain;
 
     return {
-      httpOnly: true, // XSS koruması
-      secure: secure, // HTTPS zorunluluğu
-      sameSite: sameSite as any, // CSRF koruması
+      httpOnly: true,
+      secure,
+      sameSite,
+      domain,
+      maxAge: maxAgeMs || 7 * 24 * 60 * 60 * 1000,
       path: '/',
-      domain: process.env.COOKIE_DOMAIN || undefined,
-      ...(maxAgeMs ? { maxAge: maxAgeMs } : {}),
     };
   }
 
-  private setAccessCookie(req: any, token: string) {
-    // Zone.md'ye göre: Kısa ömürlü access token (5-15 dakika)
-    const raw = process.env.ACCESS_TOKEN_TTL || '900s'; // varsayılan 15 dakika
-    const accessMs = this.parseDurationToMs(raw, 900_000); // default 15m
-    req.res.cookie('access_token', token, { ...this.cookieBaseOptions(accessMs) });
+  private setRefreshCookie(res: any, token: string, expiresAt: Date) {
+    const ttl = new Date(expiresAt).getTime() - Date.now();
+    const options = this.cookieBaseOptions(ttl);
+    res.cookie('refresh_token', token, options);
+
   }
 
-  private parseDurationToMs(input: string, fallback: number): number {
-    if (!input) return fallback;
-    const match = /^([0-9]+)([smhd]?)$/i.exec(input.trim());
-    if (!match) return fallback;
-    const value = parseInt(match[1], 10);
-    const unit = match[2]?.toLowerCase() || 's';
-    const mult: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
-    return value * (mult[unit] || 1000);
+  private clearAuthCookies(res: any) {
+    res.clearCookie('refresh_token');
   }
 
-  private setRefreshCookie(req: any, token: string, expiresAt: Date) {
-    const maxAgeRefresh = expiresAt ? new Date(expiresAt).getTime() - Date.now() : undefined;
-    req.res.cookie('refresh_token', token, { ...this.cookieBaseOptions(maxAgeRefresh) });
-  }
 
-  private clearAuthCookies(req: any) {
-    try {
-      const base = this.cookieBaseOptions(0);
-      // Tüm auth-related cookie'leri temizle
-      req.res.cookie('access_token', '', { ...base, maxAge: 0 });
-      req.res.cookie('refresh_token', '', { ...base, maxAge: 0 });
-      req.res.cookie('csrf_token', '', { ...base, maxAge: 0 });
-    } catch (e) { 
-      // Cookie temizleme hatası loglanabilir ama işlemi durdurmaz
-      console.warn('Cookie temizleme hatası:', e.message);
-    }
-  }
-
-  @ApiOperation({ 
-    summary: 'Get CSRF token for secure requests',
-    description: `
-    🔒 CSRF Koruması İçin Token Alın
-    
-    Bu endpoint'i çağırdıktan sonra:
-    1. Response'dan 'csrfToken' değerini kopyalayın
-    2. Diğer korumalı endpoint'lerde 'X-CSRF-Token' header'ına bu değeri ekleyin
-    3. Cookie otomatik olarak tarayıcı tarafından gönderilecek
-    
-    Örnek kullanım:
-    - Önce: GET /api/v1/auth/csrf
-    - Sonra: POST /api/v1/auth/login (header: X-CSRF-Token: [token])
-    `
-  })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'CSRF token başarıyla oluşturuldu',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        csrfToken: { type: 'string', example: 'a1b2c3d4e5f6789...' }
-      }
-    }
-  })
-  @Get('csrf')
-  getCsrf(@Req() req: any) {
-    const token = this.csrf.generateToken();
-    const crossSite = process.env.CROSS_SITE_COOKIES === 'true';
-    const isProduction = process.env.NODE_ENV === 'production';
-    const sameSite = crossSite ? 'None' : 'Strict';
-    
-    // Zone.md'ye göre: CSRF token hem cookie hem response'da gönderilmeli
-    req.res.cookie('csrf_token', token, {
-      httpOnly: false, // Frontend'in erişebilmesi için HttpOnly=false
-      secure: isProduction || crossSite,
-      sameSite: sameSite as any,
-      path: '/',
-      domain: process.env.COOKIE_DOMAIN || undefined,
-      maxAge: 60 * 60 * 1000, // 1 saat
-    });
-    
-    // Token'ı response'da da gönder (double submit cookie pattern)
-    return { 
-      success: true, 
-      csrfToken: token // Frontend bu token'ı header'da gönderecek
-    };
-  }
 }

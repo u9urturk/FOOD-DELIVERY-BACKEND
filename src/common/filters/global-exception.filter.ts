@@ -8,10 +8,6 @@ import {
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { Prisma } from '@prisma/client';
-import { 
-  PrismaClientKnownRequestError, 
-  PrismaClientValidationError 
-} from '@prisma/client/runtime/library';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -69,11 +65,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     // Handle Prisma errors
-    if (exception instanceof PrismaClientKnownRequestError) {
+    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       return this.handlePrismaError(exception);
     }
 
-    if (exception instanceof PrismaClientValidationError) {
+    if (exception instanceof Prisma.PrismaClientValidationError) {
       return {
         status: HttpStatus.BAD_REQUEST,
         message: 'Veritabanı doğrulama hatası oluştu',
@@ -133,7 +129,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
   }
 
-  private handlePrismaError(exception: PrismaClientKnownRequestError): {
+  private handlePrismaError(exception: Prisma.PrismaClientKnownRequestError): {
     status: number;
     message: string;
     error: string;

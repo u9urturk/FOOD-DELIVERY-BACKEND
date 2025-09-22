@@ -32,7 +32,7 @@ export class ErrorService {
   }
 
   throwUserNotFound(): never {
-    throw new NotFoundException('Kullanıcı');
+    throw new NotFoundException('Kullanıcı bulunamadı');
   }
 
   throwUsernameConflict(): never {
@@ -61,7 +61,7 @@ export class ErrorService {
   }
 
   throwNotFound(resource: string): never {
-    throw new NotFoundException(resource);
+    throw new NotFoundException(`${resource} bulunamadı`);
   }
 
   throwConflict(message: string): never {
@@ -102,7 +102,7 @@ export class ErrorService {
 
   // Order specific errors
   throwOrderNotFound(): never {
-    throw new NotFoundException('Sipariş');
+    throw new NotFoundException('Sipariş bulunamadı');
   }
 
   throwOrderCannotBeCancelled(): never {
@@ -115,7 +115,7 @@ export class ErrorService {
 
   // Table specific errors
   throwTableNotFound(): never {
-    throw new NotFoundException('Masa');
+    throw new NotFoundException('Masa bulunamadı');
   }
 
   throwTableNotAvailable(): never {
@@ -128,7 +128,7 @@ export class ErrorService {
 
   // Stock specific errors
   throwStockItemNotFound(): never {
-    throw new NotFoundException('Stok öğesi');
+    throw new NotFoundException('Stok öğesi bulunamadı');
   }
 
   throwInvalidStockQuantity(): never {

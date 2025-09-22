@@ -8,6 +8,7 @@ import { DatabaseService } from 'src/database/database.service';
 import { RolesService } from './roles/roles.service';
 import { ErrorService } from '../common/services/error.service';
 import { SessionService } from 'src/modules/profile/session/session.service';
+import { TokenBlacklistService } from 'src/redis/tokenblacklist.servise';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +19,8 @@ export class AuthService {
     private rolesService: RolesService,
     private errorService: ErrorService,
     private sessionService: SessionService,
+    private blacklist: TokenBlacklistService,
+
   ) { }
 
   async register(registerDto: RegisterDto) {
@@ -77,8 +80,6 @@ export class AuthService {
     try {
       const { username, token } = loginDto;
 
-
-      // Check rate limiting
       await this.checkRateLimit(ip);
 
       const user = await this.prisma.user.findUnique({
@@ -96,7 +97,6 @@ export class AuthService {
         this.errorService.throwUserNotFound();
       }
 
-      // If 2FA is not enabled, this is the first login
       if (!user.otpEnabled) {
         if (!user.otpSecret) {
           this.errorService.throwBusinessError('Kullanıcı OTP gizli anahtarı bulunamadı');
@@ -106,13 +106,11 @@ export class AuthService {
           this.errorService.throwInvalidOTP();
         }
 
-        // Enable 2FA
         await this.prisma.user.update({
           where: { id: user.id },
           data: { otpEnabled: true },
         });
       } else {
-        // Normal OTP verification
         if (!user.otpSecret) {
           this.errorService.throwBusinessError('Kullanıcı OTP gizli anahtarı bulunamadı');
         }
@@ -122,14 +120,9 @@ export class AuthService {
         }
       }
 
-      // Reset rate limit on successful login
       await this.resetRateLimit(ip);
 
-      // Extract role names
       const roles = user.userRoles.map((userRole) => userRole.role.name);
-
-      // Generate JWT + create session (refresh token)
-      const payload = { sub: user.id, username: user.username, roles };
       const session = await this.sessionService.generateAndStore({ userId: user.id, ip, userAgent });
       return {
         message: 'Giriş başarılı',
@@ -226,9 +219,12 @@ export class AuthService {
     }
   }
 
-  async logout(userId: string, sessionId: string) {
+  async logout(userId: string, sessionId: string, jti?: string, exp?: number) {
     try {
-      if (!sessionId) this.errorService.throwNotFound('Oturum');
+      if (!sessionId || !jti || !exp) this.errorService.throwNotFound('Oturum');
+      const ttl = exp - Math.floor(Date.now() / 1000);
+      await this.blacklist.add(jti, ttl, 'logout');
+
       return await this.sessionService.revoke(userId, sessionId, 'logout');
     } catch (error) {
       this.errorService.handleError(error, 'çıkış yapma');

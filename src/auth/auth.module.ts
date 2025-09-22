@@ -13,7 +13,6 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { RateLimitGuard } from 'src/common/guards/rate-limit.guard';
 import { ErrorService } from '../common/services/error.service';
 import { ProfileModule } from 'src/modules/profile/profile.module';
-import { CsrfService } from './csrf.service';
 import { TokenService } from './token.service';
 
 @Module({
@@ -32,7 +31,7 @@ import { TokenService } from './token.service';
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, OtpService, JwtStrategy, RateLimitGuard, RolesGuard, ErrorService, CsrfService, TokenService],
+  providers: [AuthService, OtpService, JwtStrategy, RateLimitGuard, RolesGuard, ErrorService, TokenService],
   controllers: [AuthController],
   exports: [OtpService],
 })
