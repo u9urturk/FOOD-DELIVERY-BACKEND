@@ -1,0 +1,689 @@
+// prisma/schema.prisma
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows", "darwin-arm64", "darwin"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User & Auth Models
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  name         String?
+  surname      String?
+  otpSecret    String?
+  otpEnabled   Boolean  @default(false)
+  recoveryCode String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Profile / Security Extensions
+  email                String?   @unique
+  passwordHash         String?
+  locale               String?   @default("tr-TR")
+  timeZone             String?   @default("UTC")
+  theme                String?   @default("light")
+  density              String?   @default("comfortable")
+  notificationEmail    Boolean   @default(true)
+  notificationPush     Boolean   @default(true)
+  lastLoginAt          DateTime?
+  lastPasswordChangeAt DateTime?
+  failedMfaAttempts    Int       @default(0)
+  mfaLockedUntil       DateTime?
+  avatarUrl            String?
+  pendingEmail         String?
+  pendingEmailToken    String?
+  deletedAt            DateTime?
+
+  // Relations (profile related)
+  sessions     Session[]
+  activityLogs UserActivityLog[]
+
+  orders             Order[]
+  stockMovements     StockMovement[]
+  inventoryMovements InventoryMovement[]
+  notifications      Notification[]
+  userRoles          UserRole[]
+
+  @@map("users")
+}
+
+// Session management for refresh tokens / device sessions
+model Session {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  // refreshTokenHash moved to RefreshToken model to support rotation and history
+  userAgent     String?
+  ip            String?
+  createdAt     DateTime       @default(now())
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  revokedReason String?
+  // relation to refresh tokens
+  refreshTokens RefreshToken[]
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// Refresh tokens table - stores token hashes and rotation history
+model RefreshToken {
+  id            String    @id @default(cuid())
+  sessionId     String
+  session       Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokenHash     String
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime?
+  replacedBy    String? // references RefreshToken.id if needed in app logic
+  revokedAt     DateTime?
+  revokedReason String?
+  ip            String?
+  userAgent     String?
+
+  @@index([tokenHash], name: "idx_refresh_token_hash")
+  @@map("refresh_tokens")
+}
+
+// User activity / audit logging
+model UserActivityLog {
+  id        String             @id @default(cuid())
+  userId    String?
+  user      User?              @relation(fields: [userId], references: [id])
+  action    UserActivityAction
+  context   Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime           @default(now())
+
+  @@index([userId, createdAt])
+  @@map("user_activity_logs")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// Menu Models
+model MenuCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  menuItems MenuItem[]
+
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  categoryId  String
+  category    MenuCategory @relation(fields: [categoryId], references: [id])
+  price       Decimal      @db.Decimal(10, 2)
+  images      String[]
+  status      MenuStatus   @default(ACTIVE)
+
+  // Statistics
+  rating     Decimal? @db.Decimal(3, 2)
+  views      Int      @default(0)
+  likes      Int      @default(0)
+  popularity Int      @default(0)
+  prepTime   Int? // dakika
+
+  // Meta info
+  ingredients String[]
+  allergens   String[]
+  isSpecial   Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants   MenuItemVariant[]
+  orderItems OrderItem[]
+
+  @@map("menu_items")
+}
+
+model MenuItemVariant {
+  id         String   @id @default(cuid())
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("menu_item_variants")
+}
+
+// Restaurant & Table Models
+model Table {
+  id       String      @id @default(cuid())
+  number   Int         @unique
+  capacity Int
+  status   TableStatus @default(AVAILABLE)
+  area     TableArea?
+
+  // Time info
+  occupiedAt       DateTime?
+  reservedAt       DateTime?
+  serviceStartTime DateTime?
+
+  // Waiter assignment
+  waiterId String?
+  waiter   Waiter? @relation(fields: [waiterId], references: [id])
+
+  // Cleaning status
+  cleanStatus   Boolean   @default(true)
+  lastOrderTime DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@map("tables")
+}
+
+model Waiter {
+  id       String      @id @default(cuid())
+  name     String
+  phone    String?
+  email    String?
+  shift    WaiterShift
+  isActive Boolean     @default(true)
+
+  // Performance metrics
+  performanceScore   Decimal? @db.Decimal(3, 2)
+  currentOrdersCount Int      @default(0)
+
+  // Profile info
+  joiningDate DateTime
+  avatar      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tables       Table[]
+  orders       Order[]
+  performances WaiterPerformance[]
+
+  @@map("waiters")
+}
+
+model WaiterPerformance {
+  id              String   @id @default(cuid())
+  waiterId        String
+  waiter          Waiter   @relation(fields: [waiterId], references: [id])
+  date            DateTime
+  totalOrders     Int      @default(0)
+  completedOrders Int      @default(0)
+  avgServiceTime  Int      @default(0) // dakika
+  customerRating  Decimal  @default(0) @db.Decimal(3, 2)
+  efficiency      Int      @default(0) // yüzde
+  createdAt       DateTime @default(now())
+
+  @@unique([waiterId, date])
+  @@map("waiter_performances")
+}
+
+// Order Models
+model Order {
+  id          String      @id @default(cuid())
+  tableId     String
+  table       Table       @relation(fields: [tableId], references: [id])
+  status      OrderStatus @default(PENDING)
+  totalAmount Decimal     @db.Decimal(10, 2)
+
+  // Time info
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  servedAt  DateTime?
+
+  // Waiter info
+  waiterId String?
+  waiter   Waiter? @relation(fields: [waiterId], references: [id])
+
+  // Payment info
+  paymentMethod PaymentMethod?
+  isPaid        Boolean        @default(false)
+  paidAt        DateTime?
+
+  // User info
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  items OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String      @id @default(cuid())
+  orderId    String
+  order      Order       @relation(fields: [orderId], references: [id])
+  menuItemId String
+  menuItem   MenuItem    @relation(fields: [menuItemId], references: [id])
+  quantity   Int
+  unitPrice  Decimal     @db.Decimal(10, 2)
+  totalPrice Decimal     @db.Decimal(10, 2)
+  notes      String[]
+  status     OrderStatus @default(PENDING)
+
+  // Variant info
+  variantId   String?
+  variantName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("order_items")
+}
+
+// Stock Models
+model StockItem {
+  id       String  @id @default(cuid())
+  name     String
+  category String
+  barcode  String? @unique
+
+  // Unit info
+  unit        String // kg, L, adet
+  quantity    Decimal @db.Decimal(10, 3)
+  minQuantity Decimal @db.Decimal(10, 3)
+  maxQuantity Decimal @db.Decimal(10, 3)
+
+  // Price info
+  unitPrice Decimal @db.Decimal(10, 2)
+
+  // Supplier info
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+
+  // Meta info
+  description String?
+  notes       String?
+  status      StockStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements StockMovement[]
+
+  @@map("stock_items")
+}
+
+model StockMovement {
+  id               String            @id @default(cuid())
+  stockItemId      String
+  stockItem        StockItem         @relation(fields: [stockItemId], references: [id])
+  type             StockMovementType
+  quantity         Decimal           @db.Decimal(10, 3)
+  previousQuantity Decimal           @db.Decimal(10, 3)
+  newQuantity      Decimal           @db.Decimal(10, 3)
+  reason           String?
+  userId           String?
+  user             User?             @relation(fields: [userId], references: [id])
+  createdAt        DateTime          @default(now())
+
+  @@map("stock_movements")
+}
+
+model Supplier {
+  id           String   @id @default(uuid())
+  name         String
+  contactInfo  String?
+  phone        String?
+  email        String?
+  address      String?
+  leadTimeDays Int?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stockItems  StockItem[]
+  inventories Inventory[]
+
+  @@map("suppliers")
+}
+
+// Domain models from user's proposal
+model BaseUnit {
+  id     String  @id @default(uuid())
+  name   String  @unique
+  desc   String?
+  symbol String?
+
+  products Product[]
+
+  @@map("base_units")
+}
+
+model StockType {
+  id   String  @id @default(uuid())
+  name String  @unique
+  desc String?
+
+  products Product[]
+
+  @@map("stock_types")
+}
+
+model Category {
+  id   String  @id @default(uuid())
+  name String  @unique
+  desc String?
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            String  @id @default(uuid())
+  name          String
+  description   String?
+  sku           String?
+  barcode       String?
+  shelfLifeDays Int?
+
+  // Relations
+  categoryId  String
+  stockTypeId String
+  baseUnitId  String
+
+  category  Category  @relation(fields: [categoryId], references: [id])
+  stockType StockType @relation(fields: [stockTypeId], references: [id])
+  baseUnit  BaseUnit  @relation(fields: [baseUnitId], references: [id])
+
+  inventories Inventory[]
+  movements   InventoryMovement[]
+
+  @@map("products")
+}
+
+model MovementType {
+  id   String  @id @default(uuid())
+  name String  @unique
+  desc String?
+
+  inventoryMovements InventoryMovement[]
+
+  @@map("movement_types")
+}
+
+model Inventory {
+  id          String  @id @default(uuid())
+  productId   String
+  warehouseId String
+  supplierId  String?
+
+  product   Product   @relation(fields: [productId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  supplier  Supplier? @relation(fields: [supplierId], references: [id])
+
+  currentQuantity Decimal   @db.Decimal(10, 3)
+  minStockLevel   Decimal   @db.Decimal(10, 3)
+  maxStockLevel   Decimal   @db.Decimal(10, 3)
+  lastCountedAt   DateTime?
+  lotNumber       String?
+  expirationDate  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("inventories")
+}
+
+// Warehouse & Inventory Movement
+model Warehouse {
+  id        String   @id @default(uuid())
+  name      String
+  location  String?
+  code      String?  @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // relations: split for clarity because InventoryMovement has two relations to Warehouse
+  inventoryFrom InventoryMovement[] @relation("WarehouseFromInventoryMovements")
+  inventoryTo   InventoryMovement[] @relation("WarehouseToInventoryMovements")
+  inventories   Inventory[]
+
+  @@map("warehouses")
+}
+
+model InventoryMovement {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  fromWarehouseId String?
+  fromWarehouse   Warehouse? @relation("WarehouseFromInventoryMovements", fields: [fromWarehouseId], references: [id])
+
+  toWarehouseId String?
+  toWarehouse   Warehouse? @relation("WarehouseToInventoryMovements", fields: [toWarehouseId], references: [id])
+
+  quantity        Decimal          @db.Decimal(10, 3)
+  unit            String
+  movementTypeId  String
+  movementType    MovementType     @relation(fields: [movementTypeId], references: [id])
+  sourceEventId   String?
+  sourceEventType SourceEventType?
+  timestamp       DateTime
+  createdAt       DateTime         @default(now())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+
+  @@map("inventory_movements")
+}
+
+// Analytics Models
+model RevenueData {
+  id            String   @id @default(cuid())
+  date          DateTime
+  revenue       Decimal  @db.Decimal(10, 2)
+  orderCount    Int
+  avgOrderValue Decimal  @db.Decimal(10, 2)
+  period        Period
+  createdAt     DateTime @default(now())
+
+  @@unique([date, period])
+  @@map("revenue_data")
+}
+
+model TopSellingItem {
+  id            String   @id @default(cuid())
+  menuItemId    String
+  menuItemName  String
+  category      String
+  totalQuantity Int
+  totalRevenue  Decimal  @db.Decimal(10, 2)
+  percentage    Decimal  @db.Decimal(5, 2)
+  period        DateTime
+  createdAt     DateTime @default(now())
+
+  @@map("top_selling_items")
+}
+
+model DashboardStats {
+  id              String   @id @default(cuid())
+  date            DateTime @unique
+  totalOrders     Int      @default(0)
+  totalRevenue    Decimal  @default(0) @db.Decimal(10, 2)
+  totalCustomers  Int      @default(0)
+  avgOrderValue   Decimal  @default(0) @db.Decimal(10, 2)
+  activeTables    Int      @default(0)
+  availableTables Int      @default(0)
+  reservedTables  Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@map("dashboard_stats")
+}
+
+// Notification Model
+model Notification {
+  id        String               @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean              @default(false)
+  userId    String?
+  user      User?                @relation(fields: [userId], references: [id])
+  tableId   String?
+  orderId   String?
+  priority  NotificationPriority @default(MEDIUM)
+  createdAt DateTime             @default(now())
+  readAt    DateTime?
+
+  @@map("notifications")
+}
+
+// Enums
+
+enum MenuStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+}
+
+enum TableArea {
+  GARDEN
+  INDOOR
+  TERRACE
+}
+
+enum WaiterShift {
+  MORNING
+  AFTERNOON
+  EVENING
+  NIGHT
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
+enum StockStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+enum SourceEventType {
+  PURCHASE_ORDER
+  SALES_ORDER
+  TRANSFER
+  ADJUSTMENT
+  OTHER
+}
+
+enum Period {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum NotificationType {
+  ORDER
+  PAYMENT
+  STOCK
+  SYSTEM
+}
+
+enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// User activity actions enum for audit logging
+enum UserActivityAction {
+  PROFILE_UPDATE
+  PASSWORD_CHANGE
+  MFA_ENABLED
+  MFA_DISABLED
+  SESSION_REVOKE
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  EMAIL_CHANGE_REQUEST
+  EMAIL_CHANGE_CONFIRM
+}

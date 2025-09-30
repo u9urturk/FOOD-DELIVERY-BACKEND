@@ -1,0 +1,182 @@
+# ==============================================
+# Node.js & Build Output
+# ==============================================
+# compiled output
+/dist
+/node_modules
+/build
+/docs
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+/coverage
+/.nyc_output
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ==============================================
+# Environment & Configuration Files
+# ==============================================
+# Environment variables (KEEP .env.example)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.docker
+.env.prod
+.env.railway
+
+# ==============================================
+# Local Development Files (Production'da gereksiz)
+# ==============================================
+# Local development scripts
+local-server.bat
+local-server.ps1
+firewall-setup.bat
+
+# Development documentation
+DOCKER-SETUP.md
+LOCAL-SERVER.md
+
+# Local Docker compose files (development only)
+docker-compose.simple.yml
+docker-compose.local.yml
+
+# Keep docker-compose.production.yml for cloud deployment
+
+# ==============================================
+# Development & Deployment Scripts
+# ==============================================
+# Deployment scripts (manuel deployment için)
+deployment/
+scripts/
+
+# ==============================================
+# Local Development Folders
+# ==============================================
+# Local runtime folders
+logs/
+uploads/
+backups/
+temp/
+.temp
+.tmp
+
+# ==============================================
+# IDE & Editor Files
+# ==============================================
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode (keep some settings)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# ==============================================
+# Docker & Container Files
+# ==============================================
+# Docker development files
+.dockerignore.dev
+docker-commands.md
+
+# ==============================================
+# Database & Cache
+# ==============================================
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# ==============================================
+# SSL & Security
+# ==============================================
+# SSL certificates
+*.pem
+*.key
+*.crt
+ssl/
+certs/
+
+# ==============================================
+# Testing & Documentation
+# ==============================================
+# Test results
+test-results/
+playwright-report/
+test-output/
+
+# Documentation (keep essential docs)
+# Keep: README.md, RENDER_DEPLOYMENT.md, render.yaml
+
+# ==============================================
+# Package Managers
+# ==============================================
+# Yarn
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ==============================================
+# Cloud & CI/CD (if needed)
+# ==============================================
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# GitHub Actions (if using)
+# .github/ (keep if using CI/CD)
+
+# ==============================================
+# Miscellaneous
+# ==============================================
+# MacOS
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
