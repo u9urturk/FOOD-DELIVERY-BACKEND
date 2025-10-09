@@ -11,10 +11,10 @@ export class CreateProductDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ example: 'CB-001', required: false })
-  @IsOptional()
-  @IsString()
-  sku?: string;
+  // @ApiProperty({ example: 'CB-001', required: false })
+  // @IsOptional()
+  // @IsString().    note: sku backend tarafıdan otomatik olarak oluşturalacak.input ihtiyacı bulunmamakta 
+  // sku?: string;
 
   @ApiProperty({ example: '1234567890123', required: false })
   @IsOptional()

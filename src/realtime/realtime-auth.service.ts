@@ -8,7 +8,7 @@ interface TokenPayload { sub: string; sessionId?: string; sid?: string; [k: stri
 
 interface JwtHeader { alg?: string; typ?: string; kid?: string; [k: string]: any }
 
-function safeBase64JsonDecode(segment: string): any | undefined {
+function safeBase64JsonDecode(segment:  string): any | undefined {
     try {
         const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
         const json = Buffer.from(normalized, 'base64').toString('utf8');
