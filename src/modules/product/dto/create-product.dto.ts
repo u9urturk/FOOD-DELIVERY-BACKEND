@@ -1,7 +1,14 @@
-import { IsString, IsOptional, IsUUID, IsInt, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsArray, IsUrl, ArrayMaxSize, IsEnum, IsDecimal, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { ProductStatus } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class CreateProductDto {
+  @ApiProperty({ example: '1234567890123', required: false })
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
   @ApiProperty({ example: 'Cheeseburger', description: 'Product name' })
   @IsString()
   name: string;
@@ -11,20 +18,29 @@ export class CreateProductDto {
   @IsString()
   description?: string;
 
-  // @ApiProperty({ example: 'CB-001', required: false })
-  // @IsOptional()
-  // @IsString().    note: sku backend tarafıdan otomatik olarak oluşturalacak.input ihtiyacı bulunmamakta 
-  // sku?: string;
-
-  @ApiProperty({ example: '1234567890123', required: false })
+  @ApiProperty({ example: 'Additional notes about the product', required: false })
   @IsOptional()
   @IsString()
-  barcode?: string;
+  note?: string;
 
-  @ApiProperty({ example: 7, required: false })
+  @ApiProperty({ 
+    example: ['https://example.com/image1.jpg', 'https://example.com/image2.jpg'], 
+    description: 'Product image URLs (maximum 3 images)',
+    required: false 
+  })
   @IsOptional()
-  @IsInt()
-  shelfLifeDays?: number;
+  @IsArray()
+  @ArrayMaxSize(3)
+  @IsUrl({}, { each: true })
+  imageUrls?: string[];
+
+  @ApiProperty({ 
+    example: ProductStatus.ACTIVE, 
+    description: 'Product status',
+    enum: ProductStatus 
+  })
+  @IsEnum(ProductStatus)
+  status: ProductStatus;
 
   @ApiProperty({ example: 'b3f8a6e2-1c2d-4f5a-9e5d-0a1b2c3d4e5f' })
   @IsUUID()

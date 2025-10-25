@@ -23,6 +23,9 @@ CREATE TYPE "public"."StockStatus" AS ENUM ('ACTIVE', 'INACTIVE');
 CREATE TYPE "public"."StockMovementType" AS ENUM ('IN', 'OUT', 'ADJUSTMENT');
 
 -- CreateEnum
+CREATE TYPE "public"."SourceEventType" AS ENUM ('PURCHASE_ORDER', 'SALES_ORDER', 'TRANSFER', 'ADJUSTMENT', 'OTHER');
+
+-- CreateEnum
 CREATE TYPE "public"."Period" AS ENUM ('DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY');
 
 -- CreateEnum
@@ -32,7 +35,19 @@ CREATE TYPE "public"."NotificationType" AS ENUM ('ORDER', 'PAYMENT', 'STOCK', 'S
 CREATE TYPE "public"."NotificationPriority" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'URGENT');
 
 -- CreateEnum
+CREATE TYPE "public"."ProductStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'DRAFT');
+
+-- CreateEnum
 CREATE TYPE "public"."UserActivityAction" AS ENUM ('PROFILE_UPDATE', 'PASSWORD_CHANGE', 'MFA_ENABLED', 'MFA_DISABLED', 'SESSION_REVOKE', 'LOGIN_SUCCESS', 'LOGIN_FAILURE', 'EMAIL_CHANGE_REQUEST', 'EMAIL_CHANGE_CONFIRM');
+
+-- CreateEnum
+CREATE TYPE "public"."WarehouseStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'MAINTENANCE');
+
+-- CreateEnum
+CREATE TYPE "public"."WarehouseType" AS ENUM ('NORMAL', 'COLD', 'FROZEN', 'DRY');
+
+-- CreateEnum
+CREATE TYPE "public"."SupplierStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'PENDING');
 
 -- CreateTable
 CREATE TABLE "public"."users" (
@@ -147,191 +162,160 @@ CREATE TABLE "public"."role_permissions" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."menu_categories" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "sortOrder" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "menu_categories_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."menu_items" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "categoryId" TEXT NOT NULL,
-    "price" DECIMAL(10,2) NOT NULL,
-    "images" TEXT[],
-    "status" "public"."MenuStatus" NOT NULL DEFAULT 'ACTIVE',
-    "rating" DECIMAL(3,2),
-    "views" INTEGER NOT NULL DEFAULT 0,
-    "likes" INTEGER NOT NULL DEFAULT 0,
-    "popularity" INTEGER NOT NULL DEFAULT 0,
-    "prepTime" INTEGER,
-    "ingredients" TEXT[],
-    "allergens" TEXT[],
-    "isSpecial" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "menu_items_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."menu_item_variants" (
-    "id" TEXT NOT NULL,
-    "menuItemId" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "price" DECIMAL(10,2) NOT NULL,
-    "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "menu_item_variants_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."tables" (
-    "id" TEXT NOT NULL,
-    "number" INTEGER NOT NULL,
-    "capacity" INTEGER NOT NULL,
-    "status" "public"."TableStatus" NOT NULL DEFAULT 'AVAILABLE',
-    "area" "public"."TableArea",
-    "occupiedAt" TIMESTAMP(3),
-    "reservedAt" TIMESTAMP(3),
-    "serviceStartTime" TIMESTAMP(3),
-    "waiterId" TEXT,
-    "cleanStatus" BOOLEAN NOT NULL DEFAULT true,
-    "lastOrderTime" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "tables_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."waiters" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "phone" TEXT,
-    "email" TEXT,
-    "shift" "public"."WaiterShift" NOT NULL,
-    "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "performanceScore" DECIMAL(3,2),
-    "currentOrdersCount" INTEGER NOT NULL DEFAULT 0,
-    "joiningDate" TIMESTAMP(3) NOT NULL,
-    "avatar" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "waiters_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."waiter_performances" (
-    "id" TEXT NOT NULL,
-    "waiterId" TEXT NOT NULL,
-    "date" TIMESTAMP(3) NOT NULL,
-    "totalOrders" INTEGER NOT NULL DEFAULT 0,
-    "completedOrders" INTEGER NOT NULL DEFAULT 0,
-    "avgServiceTime" INTEGER NOT NULL DEFAULT 0,
-    "customerRating" DECIMAL(3,2) NOT NULL DEFAULT 0,
-    "efficiency" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "waiter_performances_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."orders" (
-    "id" TEXT NOT NULL,
-    "tableId" TEXT NOT NULL,
-    "status" "public"."OrderStatus" NOT NULL DEFAULT 'PENDING',
-    "totalAmount" DECIMAL(10,2) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "servedAt" TIMESTAMP(3),
-    "waiterId" TEXT,
-    "paymentMethod" "public"."PaymentMethod",
-    "isPaid" BOOLEAN NOT NULL DEFAULT false,
-    "paidAt" TIMESTAMP(3),
-    "userId" TEXT,
-
-    CONSTRAINT "orders_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."order_items" (
-    "id" TEXT NOT NULL,
-    "orderId" TEXT NOT NULL,
-    "menuItemId" TEXT NOT NULL,
-    "quantity" INTEGER NOT NULL,
-    "unitPrice" DECIMAL(10,2) NOT NULL,
-    "totalPrice" DECIMAL(10,2) NOT NULL,
-    "notes" TEXT[],
-    "status" "public"."OrderStatus" NOT NULL DEFAULT 'PENDING',
-    "variantId" TEXT,
-    "variantName" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "order_items_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."stock_items" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "category" TEXT NOT NULL,
-    "barcode" TEXT,
-    "unit" TEXT NOT NULL,
-    "quantity" DECIMAL(10,3) NOT NULL,
-    "minQuantity" DECIMAL(10,3) NOT NULL,
-    "maxQuantity" DECIMAL(10,3) NOT NULL,
-    "unitPrice" DECIMAL(10,2) NOT NULL,
-    "supplierId" TEXT,
-    "description" TEXT,
-    "notes" TEXT,
-    "status" "public"."StockStatus" NOT NULL DEFAULT 'ACTIVE',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "stock_items_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."stock_movements" (
-    "id" TEXT NOT NULL,
-    "stockItemId" TEXT NOT NULL,
-    "type" "public"."StockMovementType" NOT NULL,
-    "quantity" DECIMAL(10,3) NOT NULL,
-    "previousQuantity" DECIMAL(10,3) NOT NULL,
-    "newQuantity" DECIMAL(10,3) NOT NULL,
-    "reason" TEXT,
-    "userId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "stock_movements_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "public"."suppliers" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "contactPerson" TEXT,
-    "phone" TEXT,
-    "email" TEXT,
-    "address" TEXT,
+    "category" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "rating" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "status" "public"."SupplierStatus" NOT NULL DEFAULT 'ACTIVE',
+    "address" TEXT NOT NULL,
+    "contactPerson" TEXT NOT NULL,
+    "taxNumber" TEXT NOT NULL,
+    "paymentTerms" TEXT NOT NULL,
+    "deliveryTime" INTEGER NOT NULL DEFAULT 0,
+    "minimumOrder" DECIMAL(10,2) NOT NULL DEFAULT 0,
+    "products" TEXT[],
+    "contractStartDate" TIMESTAMP(3),
+    "contractEndDate" TIMESTAMP(3),
+    "totalOrders" INTEGER NOT NULL DEFAULT 0,
+    "monthlyDeliveries" INTEGER NOT NULL DEFAULT 0,
+    "contactInfo" TEXT,
+    "leadTimeDays" INTEGER,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "suppliers_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."base_units" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "desc" TEXT,
+    "symbol" TEXT,
+    "shortName" TEXT NOT NULL,
+    "conversionFactor" DOUBLE PRECISION,
+    "baseUnit" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "base_units_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."stock_types" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "color" TEXT DEFAULT 'from-blue-500 to-blue-600',
+    "icon" TEXT DEFAULT '📦',
+    "examples" TEXT[],
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "stock_types_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."categories" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "desc" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "categories_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."products" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "sku" TEXT,
+    "barcode" TEXT,
+    "note" TEXT,
+    "imageUrls" TEXT[],
+    "price" DECIMAL(10,2) NOT NULL,
+    "status" "public"."ProductStatus" NOT NULL DEFAULT 'ACTIVE',
+    "categoryId" TEXT NOT NULL,
+    "stockTypeId" TEXT NOT NULL,
+    "baseUnitId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "products_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."movement_types" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "desc" TEXT,
+
+    CONSTRAINT "movement_types_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."inventories" (
+    "id" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "warehouseId" TEXT NOT NULL,
+    "supplierId" TEXT,
+    "currentQuantity" DECIMAL(10,3) NOT NULL,
+    "minStockLevel" DECIMAL(10,3) NOT NULL,
+    "maxStockLevel" DECIMAL(10,3) NOT NULL,
+    "lastCountedAt" TIMESTAMP(3),
+    "lotNumber" TEXT,
+    "expirationDate" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "inventories_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."warehouses" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "location" TEXT NOT NULL,
+    "capacity" TEXT NOT NULL,
+    "capacityPercentage" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "status" "public"."WarehouseStatus" NOT NULL DEFAULT 'ACTIVE',
+    "manager" TEXT NOT NULL,
+    "staffCount" INTEGER NOT NULL DEFAULT 0,
+    "area" DOUBLE PRECISION NOT NULL,
+    "temperature" DOUBLE PRECISION,
+    "warehouseType" "public"."WarehouseType" NOT NULL DEFAULT 'NORMAL',
+    "code" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "warehouses_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."inventory_movements" (
+    "id" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "fromWarehouseId" TEXT,
+    "toWarehouseId" TEXT,
+    "quantity" DECIMAL(10,3) NOT NULL,
+    "unit" TEXT NOT NULL,
+    "movementTypeId" TEXT NOT NULL,
+    "sourceEventId" TEXT,
+    "sourceEventType" "public"."SourceEventType",
+    "timestamp" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "inventory_movements_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -417,16 +401,22 @@ CREATE UNIQUE INDEX "roles_name_key" ON "public"."roles"("name");
 CREATE UNIQUE INDEX "permissions_name_key" ON "public"."permissions"("name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "menu_categories_name_key" ON "public"."menu_categories"("name");
+CREATE UNIQUE INDEX "base_units_name_key" ON "public"."base_units"("name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "tables_number_key" ON "public"."tables"("number");
+CREATE UNIQUE INDEX "base_units_shortName_key" ON "public"."base_units"("shortName");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "waiter_performances_waiterId_date_key" ON "public"."waiter_performances"("waiterId", "date");
+CREATE UNIQUE INDEX "stock_types_name_key" ON "public"."stock_types"("name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "stock_items_barcode_key" ON "public"."stock_items"("barcode");
+CREATE UNIQUE INDEX "categories_name_key" ON "public"."categories"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "movement_types_name_key" ON "public"."movement_types"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "warehouses_code_key" ON "public"."warehouses"("code");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "revenue_data_date_period_key" ON "public"."revenue_data"("date", "period");
@@ -456,40 +446,37 @@ ALTER TABLE "public"."role_permissions" ADD CONSTRAINT "role_permissions_roleId_
 ALTER TABLE "public"."role_permissions" ADD CONSTRAINT "role_permissions_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "public"."permissions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."menu_items" ADD CONSTRAINT "menu_items_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "public"."menu_categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."products" ADD CONSTRAINT "products_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "public"."categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."menu_item_variants" ADD CONSTRAINT "menu_item_variants_menuItemId_fkey" FOREIGN KEY ("menuItemId") REFERENCES "public"."menu_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."products" ADD CONSTRAINT "products_stockTypeId_fkey" FOREIGN KEY ("stockTypeId") REFERENCES "public"."stock_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."tables" ADD CONSTRAINT "tables_waiterId_fkey" FOREIGN KEY ("waiterId") REFERENCES "public"."waiters"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."products" ADD CONSTRAINT "products_baseUnitId_fkey" FOREIGN KEY ("baseUnitId") REFERENCES "public"."base_units"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."waiter_performances" ADD CONSTRAINT "waiter_performances_waiterId_fkey" FOREIGN KEY ("waiterId") REFERENCES "public"."waiters"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."inventories" ADD CONSTRAINT "inventories_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."orders" ADD CONSTRAINT "orders_tableId_fkey" FOREIGN KEY ("tableId") REFERENCES "public"."tables"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."inventories" ADD CONSTRAINT "inventories_warehouseId_fkey" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."orders" ADD CONSTRAINT "orders_waiterId_fkey" FOREIGN KEY ("waiterId") REFERENCES "public"."waiters"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."inventories" ADD CONSTRAINT "inventories_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "public"."suppliers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."orders" ADD CONSTRAINT "orders_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."inventory_movements" ADD CONSTRAINT "inventory_movements_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."order_items" ADD CONSTRAINT "order_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "public"."orders"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."inventory_movements" ADD CONSTRAINT "inventory_movements_fromWarehouseId_fkey" FOREIGN KEY ("fromWarehouseId") REFERENCES "public"."warehouses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."order_items" ADD CONSTRAINT "order_items_menuItemId_fkey" FOREIGN KEY ("menuItemId") REFERENCES "public"."menu_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."inventory_movements" ADD CONSTRAINT "inventory_movements_toWarehouseId_fkey" FOREIGN KEY ("toWarehouseId") REFERENCES "public"."warehouses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."stock_items" ADD CONSTRAINT "stock_items_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "public"."suppliers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."inventory_movements" ADD CONSTRAINT "inventory_movements_movementTypeId_fkey" FOREIGN KEY ("movementTypeId") REFERENCES "public"."movement_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."stock_movements" ADD CONSTRAINT "stock_movements_stockItemId_fkey" FOREIGN KEY ("stockItemId") REFERENCES "public"."stock_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."stock_movements" ADD CONSTRAINT "stock_movements_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."inventory_movements" ADD CONSTRAINT "inventory_movements_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."notifications" ADD CONSTRAINT "notifications_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;

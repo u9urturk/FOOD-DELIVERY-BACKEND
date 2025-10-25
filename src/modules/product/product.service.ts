@@ -3,6 +3,7 @@ import { DatabaseService } from 'src/database/database.service';
 import { ErrorService } from 'src/common/services/error.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { ProductStatus } from '@prisma/client';
 
 
 @Injectable()
@@ -66,14 +67,20 @@ export class ProductService {
    */
   private async generateUniqueSku(productName: string, categoryId: string): Promise<string> {
     try {
-      // Kategori bilgisini çek
+      // Kategori bilgisini çek ve validate et
+      if (!categoryId || typeof categoryId !== 'string') {
+        throw new Error('Geçersiz kategori ID');
+      }
+
       const category = await this.prisma.category.findUnique({
-        where: { id: categoryId },
-        select: { name: true }
+        where: { id: categoryId.trim() }, // Trim whitespace
+        select: { name: true, id: true }
       });
 
       if (!category) {
-        throw new Error('Kategori bulunamadı');
+        // Alternatif olarak tüm kategorileri kontrol et
+        const categoryCount = await this.prisma.category.count();
+        throw new Error(`Kategori bulunamadı - ID: ${categoryId} (Total categories: ${categoryCount})`);
       }
 
       // Ürün adından ilk 3 karakteri al ve temizle
@@ -152,7 +159,17 @@ export class ProductService {
 
   async update(id: string, dto: UpdateProductDto) {
     try {
-      const product = await this.prisma.product.update({ where: { id }, data: dto });
+      const product = await this.prisma.product.update({ 
+        where: { id }, 
+        data: {
+          ...dto
+        },
+        include: { 
+          category: true, 
+          stockType: true, 
+          baseUnit: true 
+        }
+      });
       return product;
     } catch (e) {
       this.errorService.handleError(e, 'update product');

@@ -10,7 +10,10 @@ export class CategoryService {
 
   async findAll() {
     try {
-      return await this.prisma.category.findMany({ include: { products: true } });
+      return await this.prisma.category.findMany({ 
+        include: { products: true },
+        orderBy: { createdAt: 'desc' }
+      });
     } catch (e) {
       this.errorService.handleError(e, 'liste categories');
     }
@@ -18,7 +21,10 @@ export class CategoryService {
 
   async findOne(id: string) {
     try {
-      const item = await this.prisma.category.findUnique({ where: { id }, include: { products: true } });
+      const item = await this.prisma.category.findUnique({ 
+        where: { id }, 
+        include: { products: true } 
+      });
       if (!item) this.errorService.throwNotFound('Category');
       return item;
     } catch (e) {
@@ -28,7 +34,10 @@ export class CategoryService {
 
   async create(dto: CreateCategoryDto) {
     try {
-      return await this.prisma.category.create({ data: dto });
+      return await this.prisma.category.create({ 
+        data: dto,
+        include: { products: true }
+      });
     } catch (e) {
       this.errorService.handleError(e, 'create category');
     }
@@ -36,7 +45,11 @@ export class CategoryService {
 
   async update(id: string, dto: UpdateCategoryDto) {
     try {
-      return await this.prisma.category.update({ where: { id }, data: dto });
+      return await this.prisma.category.update({ 
+        where: { id }, 
+        data: dto,
+        include: { products: true }
+      });
     } catch (e) {
       this.errorService.handleError(e, 'update category');
     }
@@ -48,6 +61,68 @@ export class CategoryService {
       return { message: 'deleted' };
     } catch (e) {
       this.errorService.handleError(e, 'delete category');
+    }
+  }
+
+  /**
+   * Get category statistics
+   * Returns count of categories with products and empty categories
+   */
+  async getStats() {
+    try {
+      // Total kategori sayısı
+      const totalCategories = await this.prisma.category.count();
+      
+      // Ürünü olan kategoriler (en az 1 ürünü olan)
+      const categoriesWithProducts = await this.prisma.category.count({
+        where: {
+          products: {
+            some: {} // En az bir ürünü var
+          }
+        }
+      });
+      
+      // Boş kategoriler (hiç ürünü olmayan)
+      const emptyCategories = totalCategories - categoriesWithProducts;
+      
+      return {
+        totalCategories,
+        categoriesWithProducts,
+        emptyCategories
+      };
+    } catch (e) {
+      this.errorService.handleError(e, 'get category stats');
+    }
+  }
+
+  /**
+   * Get categories with their product counts
+   * Useful for detailed analytics
+   */
+  async getCategoriesWithProductCounts() {
+    try {
+      const categories = await this.prisma.category.findMany({
+        select: {
+          id: true,
+          name: true,
+          desc: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              products: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      return categories.map(category => ({
+        ...category,
+        productCount: category._count.products
+      }));
+    } catch (e) {
+      this.errorService.handleError(e, 'get categories with product counts');
     }
   }
 }

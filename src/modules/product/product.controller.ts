@@ -27,9 +27,30 @@ export class ProductController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create Product' })
+  @ApiOperation({ 
+    summary: 'Create Product',
+    description: 'Create a new product. SKU will be auto-generated based on product name and category (Format: [PRODUCT_3CHAR]-[CATEGORY_2CHAR]-[NUMBER])'
+  })
   @ApiBody({ type: CreateProductDto, description: 'Create Product payload' })
-  @ApiResponse({ status: 201, description: 'Product created' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Product created successfully with auto-generated SKU',
+    schema: {
+      example: {
+        id: 'e7b8a9c2-1a2b-4c3d-9e0f-1a2b3c4d5e6f',
+        name: 'Cheeseburger',
+        description: 'Delicious beef burger with cheese',
+        sku: 'CHE-BU-001',
+        barcode: '1234567890123',
+        status: 'ACTIVE',
+        categoryId: 'b3f8a6e2-1c2d-4f5a-9e5d-0a1b2c3d4e5f',
+        stockTypeId: 'd4f8b6c2-2b3c-4a5d-9e6f-1b2c3d4e5f6a',
+        baseUnitId: 'a1b2c3d4-e5f6-4a3b-9c8d-0e1f2a3b4c5d',
+        createdAt: '2025-10-17T10:44:51.000Z',
+        updatedAt: '2025-10-17T10:44:51.000Z'
+      }
+    }
+  })
   async create(@Body() dto: CreateProductDto) {
     return this.service.create(dto);
   }

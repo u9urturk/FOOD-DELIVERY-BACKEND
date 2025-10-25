@@ -10,7 +10,10 @@ export class BaseUnitService {
 
     async findAll() {
         try {
-            return await this.prisma.baseUnit.findMany({ include: { products: true } });
+            return await this.prisma.baseUnit.findMany({ 
+                include: { products: true },
+                orderBy: { createdAt: 'desc' }
+            });
         } catch (e) {
             this.errorService.handleError(e, 'liste base units');
         }
@@ -18,7 +21,10 @@ export class BaseUnitService {
 
     async findOne(id: string) {
         try {
-            const item = await this.prisma.baseUnit.findUnique({ where: { id }, include: { products: true } });
+            const item = await this.prisma.baseUnit.findUnique({ 
+                where: { id }, 
+                include: { products: true } 
+            });
             if (!item) this.errorService.throwNotFound('BaseUnit');
             return item;
         } catch (e) {
@@ -28,7 +34,10 @@ export class BaseUnitService {
 
     async create(dto: CreateBaseUnitDto) {
         try {
-            return await this.prisma.baseUnit.create({ data: dto });
+            return await this.prisma.baseUnit.create({ 
+                data: dto,
+                include: { products: true }
+            });
         } catch (e) {
             this.errorService.handleError(e, 'create base unit');
         }
@@ -36,7 +45,11 @@ export class BaseUnitService {
 
     async update(id: string, dto: UpdateBaseUnitDto) {
         try {
-            return await this.prisma.baseUnit.update({ where: { id }, data: dto });
+            return await this.prisma.baseUnit.update({ 
+                where: { id }, 
+                data: dto,
+                include: { products: true }
+            });
         } catch (e) {
             this.errorService.handleError(e, 'update base unit');
         }

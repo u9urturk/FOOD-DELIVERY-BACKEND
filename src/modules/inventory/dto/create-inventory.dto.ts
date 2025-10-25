@@ -32,10 +32,9 @@ export class CreateInventoryDto {
   @IsDateString()
   lastCountedAt?: string;
 
-  @ApiProperty({ example: 'LOT-2025-0001', required: false })
-  @IsOptional()
-  @IsString()
-  lotNumber?: string;
+  @ApiProperty({ example: 12.50, description: 'Unit price for this specific lot/batch' })
+  @IsNumber()
+  unitPrice: number;
 
   @ApiProperty({ example: '2026-01-01T00:00:00.000Z', required: false })
   @IsOptional()
