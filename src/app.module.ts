@@ -16,11 +16,9 @@ import { ProductModule } from './modules/product/product.module';
 import { CategoryModule } from './modules/category/category.module';
 import { StockTypeModule } from './modules/stock-type/stock-type.module';
 import { BaseUnitModule } from './modules/base-unit/base-unit.module';
-import { InventoryModule } from './modules/inventory/inventory.module';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
-import { InventoryMovementModule } from './modules/inventory-movement/inventory-movement.module';
-import { MovementTypeModule } from './modules/movement-type/movement-type.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 
 @Module({
   imports: [
@@ -41,11 +39,9 @@ import { SupplierModule } from './modules/supplier/supplier.module';
     CategoryModule,
     StockTypeModule,
     BaseUnitModule,
-    InventoryModule,
     WarehouseModule,
-    InventoryMovementModule,
-    MovementTypeModule,
-    SupplierModule
+    SupplierModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

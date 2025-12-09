@@ -44,10 +44,10 @@ model User {
   sessions     Session[]
   activityLogs UserActivityLog[]
 
-  // orders             Order[] // Order model not defined yet
-  inventoryMovements InventoryMovement[]
+  // orders             Order[]
   notifications      Notification[]
   userRoles          UserRole[]
+  inventoryMovements InventoryMovement[]
 
   @@map("users")
 }
@@ -183,8 +183,7 @@ model Supplier {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
-  // stockItems  StockItem[] // Model not defined yet
-  inventories Inventory[]
+  subInventories SubInventory[]
 
   @@map("suppliers")
 }
@@ -239,8 +238,6 @@ model Product {
   id            String        @id @default(uuid())
   name          String
   description   String?
-  sku           String?
-  barcode       String?
   note          String?
   imageUrls     String[]
   status        ProductStatus @default(ACTIVE)
@@ -254,47 +251,51 @@ model Product {
   stockType StockType @relation(fields: [stockTypeId], references: [id])
   baseUnit  BaseUnit  @relation(fields: [baseUnitId], references: [id])
 
+  inventory          Inventory?
+  inventoryMovements InventoryMovement[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  inventories Inventory[]
-  movements   InventoryMovement[]
 
   @@map("products")
 }
 
-model MovementType {
-  id   String  @id @default(uuid())
-  name String  @unique
-  desc String?
-
-  inventoryMovements InventoryMovement[]
-
-  @@map("movement_types")
-}
-
 model Inventory {
   id          String  @id @default(uuid())
-  productId   String
-  warehouseId String
-  supplierId  String?
-
-  product   Product   @relation(fields: [productId], references: [id])
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
-  supplier  Supplier? @relation(fields: [supplierId], references: [id])
+  productId   String  @unique
 
   currentQuantity Decimal   @db.Decimal(10, 3)
   minStockLevel   Decimal   @db.Decimal(10, 3)
   maxStockLevel   Decimal   @db.Decimal(10, 3)
   lastCountedAt   DateTime?
-  lotNumber       String?   // Her stok girişinde benzersiz lot numarası
-  unitPrice       Decimal   @db.Decimal(10, 2) // Her lot için farklı birim fiyat
   expirationDate  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  product        Product        @relation(fields: [productId], references: [id])
+  subInventories SubInventory[]
+
   @@map("inventories")
+}
+
+model SubInventory {
+  id          String  @id @default(uuid())
+  inventoryId String
+  warehouseId String
+  supplierId  String?
+
+  inventory Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  supplier  Supplier? @relation(fields: [supplierId], references: [id])
+
+  unitPrice      Decimal   @db.Decimal(10, 2)
+  expirationDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sub_inventories")
 }
 
 // Warehouse & Inventory Movement
@@ -318,9 +319,19 @@ model Warehouse {
   // relations: split for clarity because InventoryMovement has two relations to Warehouse
   inventoryFrom InventoryMovement[] @relation("WarehouseFromInventoryMovements")
   inventoryTo   InventoryMovement[] @relation("WarehouseToInventoryMovements")
-  inventories   Inventory[]
+  subInventories   SubInventory[]
 
   @@map("warehouses")
+}
+
+model MovementType {
+  id   String  @id @default(uuid())
+  name String  @unique
+  desc String?
+
+  inventoryMovements InventoryMovement[]
+
+  @@map("movement_types")
 }
 
 model InventoryMovement {

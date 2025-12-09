@@ -12,7 +12,7 @@ export class SupplierService {
     const suppliers = await this.db.supplier.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        inventories: true
+        subInventories: true
       }
     });
 
@@ -30,7 +30,7 @@ export class SupplierService {
     return this.db.supplier.findUnique({ 
       where: { id },
       include: {
-        inventories: true
+        subInventories: true
       }
     });
   }
@@ -62,7 +62,7 @@ export class SupplierService {
     return this.db.supplier.create({ 
       data: supplierData,
       include: {
-        inventories: true
+        subInventories: true
       }
     });
   }
@@ -97,7 +97,7 @@ export class SupplierService {
       where: { id }, 
       data: updateData,
       include: {
-        inventories: true
+        subInventories: true
       }
     });
   }

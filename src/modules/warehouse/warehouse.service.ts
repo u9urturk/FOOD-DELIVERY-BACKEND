@@ -31,7 +31,7 @@ export class WarehouseService {
     return this.db.warehouse.findUnique({
       where: { id },
       include: {
-        inventories: true,
+        subInventories: true,
         inventoryFrom: true,
         inventoryTo: true
       }
@@ -58,7 +58,7 @@ export class WarehouseService {
     return this.db.warehouse.create({
       data: warehouseData,
       include: {
-        inventories: true
+        subInventories: true
       }
     });
   }
@@ -85,7 +85,7 @@ export class WarehouseService {
       where: { id },
       data: updateData,
       include: {
-        inventories: true
+        subInventories: true
       }
     });
   }

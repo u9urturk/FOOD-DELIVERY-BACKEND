@@ -1,173 +1,354 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from 'src/database/database.service';
-import { ErrorService } from 'src/common/services/error.service';
+import { DatabaseService } from '../../database/database.service';
+import { ErrorService } from '../../common/services/error.service';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
-import { StockItem } from './types/stock-business.types';
-
+import { CreateSubInventoryDto } from './dto/create-sub-inventory.dto';
+import { UpdateSubInventoryDto } from './dto/update-sub-inventory.dto';
+import { StockAdjustmentDto, AdjustmentType } from './dto/stock-adjustment.dto';
 
 @Injectable()
 export class InventoryService {
-  constructor(private prisma: DatabaseService, private errorService: ErrorService) {}
+  constructor(
+    private readonly prisma: DatabaseService,
+    private readonly errorService: ErrorService,
+  ) {}
 
-  /**
-   * Generate automatic lot number with format: LOT-YYYY-MMDD-XXXX
-   * Example: LOT-2025-1015-0001
-   */
-  private async generateLotNumber(): Promise<string> {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const datePrefix = `LOT-${year}-${month}${day}`;
+  // ==================== INVENTORY OPERATIONS ====================
 
-    // Get the count of inventories created today to generate sequence number
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
-    
-    const todayCount = await this.prisma.inventory.count({
-      where: {
-        createdAt: {
-          gte: startOfDay,
-          lt: endOfDay,
+  async createInventory(dto: CreateInventoryDto) {
+    try {
+      return await this.prisma.inventory.create({
+        data: {
+          productId: dto.productId,
+          currentQuantity: dto.currentQuantity,
+          minStockLevel: dto.minStockLevel,
+          maxStockLevel: dto.maxStockLevel,
+          lastCountedAt: dto.lastCountedAt,
+          expirationDate: dto.expirationDate,
         },
-      },
-    });
-
-    const sequence = String(todayCount + 1).padStart(4, '0');
-    return `${datePrefix}-${sequence}`;
-  }
-
-  async findAll(): Promise<StockItem[]> {
-    try {
-      const inventories = await this.prisma.inventory.findMany({ 
-        include: { 
-          product: {
-            include: {
-              category: true,
-              stockType: true,
-              baseUnit: true
-            }
-          }, 
-          warehouse: true, 
-          supplier: true 
-        } 
-      });
-
-      // Transform data to StockItem format
-      return inventories.map(inventory => ({
-        id: inventory.id,
-        barcode: inventory.product.barcode || undefined,
-        name: inventory.product.name,
-        stockType: inventory.product.stockType.name,
-        unitType: inventory.product.baseUnit.name,
-        quantity: Number(inventory.currentQuantity),
-        minQuantity: Number(inventory.minStockLevel),
-        maxQuantity: Number(inventory.maxStockLevel),
-        unitPrice: Number(inventory.unitPrice),
-        totalPrice: Number(inventory.currentQuantity) * Number(inventory.unitPrice),
-        status: inventory.product.status === 'ACTIVE' ? 'active' : 'inactive',
-        lastUpdated: inventory.updatedAt.toISOString(),
-        supplier: inventory.supplier?.name || undefined,
-        warehouse: inventory.warehouse?.name || undefined,
-        description: inventory.product.description || undefined,
-        notes: inventory.product.note || undefined,
-        lotNumber: inventory.lotNumber || undefined,
-        // ID'ler
-        productId: inventory.productId,
-        warehouseId: inventory.warehouseId,
-        supplierId: inventory.supplierId || undefined,
-        categoryId: inventory.product.categoryId,
-        stockTypeId: inventory.product.stockTypeId,
-        baseUnitId: inventory.product.baseUnitId
-      }));
-    } catch (e) {
-      this.errorService.handleError(e, 'liste inventory');
-    }
-  }
-
-  async findOne(id: string) {
-    try {
-      const item = await this.prisma.inventory.findUnique({ where: { id }, include: { product: true, warehouse: true, supplier: true } });
-      if (!item) this.errorService.throwNotFound('Inventory');
-      return item;
-    } catch (e) {
-      this.errorService.handleError(e, 'get inventory');
-    }
-  }
-
-  /**
-   * Convert date string to proper ISO DateTime format
-   * Handles both "YYYY-MM-DD" and ISO formats
-   */
-  private formatDateForPrisma(dateString?: string): Date | undefined {
-    if (!dateString) return undefined;
-    
-    // If already in ISO format, use as is
-    if (dateString.includes('T') || dateString.includes('Z')) {
-      return new Date(dateString);
-    }
-    
-    // If just date format (YYYY-MM-DD), add time part
-    return new Date(`${dateString}T00:00:00.000Z`);
-  }
-
-  async create(dto: CreateInventoryDto) {
-    try {
-      // Generate automatic lot number
-      const lotNumber = await this.generateLotNumber();
-      
-      // Prepare data with proper date formatting
-      const data = {
-        ...dto,
-        lotNumber,
-        lastCountedAt: this.formatDateForPrisma(dto.lastCountedAt),
-        expirationDate: this.formatDateForPrisma(dto.expirationDate),
-      };
-      
-      // Create inventory with auto-generated lot number and formatted dates
-      return await this.prisma.inventory.create({ 
-        data,
-        include: { 
-          product: true, 
-          warehouse: true, 
-          supplier: true 
-        }
-      });
-    } catch (e) {
-      this.errorService.handleError(e, 'create inventory');
-    }
-  }
-
-  async update(id: string, dto: UpdateInventoryDto) {
-    try {
-      // Prepare data with proper date formatting
-      const data = {
-        ...dto,
-        lastCountedAt: dto.lastCountedAt ? this.formatDateForPrisma(dto.lastCountedAt) : undefined,
-        expirationDate: dto.expirationDate ? this.formatDateForPrisma(dto.expirationDate) : undefined,
-      };
-
-      return await this.prisma.inventory.update({ 
-        where: { id }, 
-        data,
         include: {
           product: true,
-          warehouse: true,
-          supplier: true
-        }
+          subInventories: true,
+        },
       });
-    } catch (e) {
-      this.errorService.handleError(e, 'update inventory');
+    } catch (error) {
+      this.errorService.handleError(error, 'create inventory');
     }
   }
 
-  async remove(id: string) {
+  async findAllInventories() {
     try {
-      await this.prisma.inventory.delete({ where: { id } });
-      return { message: 'deleted' };
-    } catch (e) {
-      this.errorService.handleError(e, 'delete inventory');
+      return await this.prisma.inventory.findMany({
+        include: {
+          product: true,
+          subInventories: {
+            include: {
+              warehouse: true,
+              supplier: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'find all inventories');
     }
+  }
+
+  async findInventoryById(id: string) {
+    try {
+      const inventory = await this.prisma.inventory.findUnique({
+        where: { id },
+        include: {
+          product: true,
+          subInventories: {
+            include: {
+              warehouse: true,
+              supplier: true,
+            },
+          },
+        },
+      });
+
+      if (!inventory) {
+        this.errorService.throwNotFound('Inventory not found');
+      }
+
+      return inventory;
+    } catch (error) {
+      this.errorService.handleError(error, 'find inventory');
+    }
+  }
+
+  async findInventoryByProductId(productId: string) {
+    try {
+      return await this.prisma.inventory.findFirst({
+        where: { productId },
+        include: {
+          product: true,
+          subInventories: {
+            include: {
+              warehouse: true,
+              supplier: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'find inventory by product');
+    }
+  }
+
+  async updateInventory(id: string, dto: UpdateInventoryDto) {
+    try {
+      await this.findInventoryById(id); // Check exists
+
+      return await this.prisma.inventory.update({
+        where: { id },
+        data: {
+          currentQuantity: dto.currentQuantity,
+          minStockLevel: dto.minStockLevel,
+          maxStockLevel: dto.maxStockLevel,
+          lastCountedAt: dto.lastCountedAt,
+          expirationDate: dto.expirationDate,
+        },
+        include: {
+          product: true,
+          subInventories: true,
+        },
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'update inventory');
+    }
+  }
+
+  async deleteInventory(id: string) {
+    try {
+      await this.findInventoryById(id); // Check exists
+
+      return await this.prisma.inventory.delete({
+        where: { id },
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'delete inventory');
+    }
+  }
+
+  // ==================== SUB-INVENTORY OPERATIONS ====================
+
+  async createSubInventory(dto: CreateSubInventoryDto) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Create sub-inventory
+        const subInventory = await tx.subInventory.create({
+          data: {
+            inventoryId: dto.inventoryId,
+            warehouseId: dto.warehouseId,
+            supplierId: dto.supplierId,
+            unitPrice: dto.unitPrice,
+            expirationDate: dto.expirationDate,
+          },
+          include: {
+            warehouse: true,
+            supplier: true,
+          },
+        });
+
+        // Update parent inventory quantity
+        await tx.inventory.update({
+          where: { id: dto.inventoryId },
+          data: {
+            currentQuantity: { increment: dto.quantity },
+          },
+        });
+
+        return subInventory;
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'create sub-inventory');
+    }
+  }
+
+  async findAllSubInventories(inventoryId?: string) {
+    try {
+      return await this.prisma.subInventory.findMany({
+        where: inventoryId ? { inventoryId } : undefined,
+        include: {
+          warehouse: true,
+          supplier: true,
+          inventory: {
+            include: {
+              product: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'find sub-inventories');
+    }
+  }
+
+  async findSubInventoryById(id: string) {
+    try {
+      const subInventory = await this.prisma.subInventory.findUnique({
+        where: { id },
+        include: {
+          warehouse: true,
+          supplier: true,
+          inventory: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      if (!subInventory) {
+        this.errorService.throwNotFound('Sub-inventory not found');
+      }
+
+      return subInventory;
+    } catch (error) {
+      this.errorService.handleError(error, 'find sub-inventory');
+    }
+  }
+
+  async updateSubInventory(id: string, dto: UpdateSubInventoryDto) {
+    try {
+      await this.findSubInventoryById(id); // Check exists
+
+      return await this.prisma.subInventory.update({
+        where: { id },
+        data: {
+          warehouseId: dto.warehouseId,
+          supplierId: dto.supplierId,
+          unitPrice: dto.unitPrice,
+          expirationDate: dto.expirationDate,
+        },
+        include: {
+          warehouse: true,
+          supplier: true,
+        },
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'update sub-inventory');
+    }
+  }
+
+  async deleteSubInventory(id: string) {
+    try {
+      await this.findSubInventoryById(id);
+
+      return await this.prisma.subInventory.delete({
+        where: { id },
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'delete sub-inventory');
+    }
+  }
+
+  // ==================== STOCK OPERATIONS ====================
+
+  async adjustStock(dto: StockAdjustmentDto) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const subInventory = await tx.subInventory.findUnique({
+          where: { id: dto.subInventoryId },
+          include: { inventory: true },
+        });
+
+        if (!subInventory) {
+          this.errorService.throwNotFound('Sub-inventory not found');
+        }
+
+        const adjustment =
+          dto.type === AdjustmentType.ADD ? dto.quantity : -dto.quantity;
+
+        // Update parent inventory
+        const updated = await tx.inventory.update({
+          where: { id: subInventory.inventoryId },
+          data: {
+            currentQuantity: { increment: adjustment },
+            lastCountedAt: new Date(),
+          },
+        });
+
+        return {
+          success: true,
+          adjustment,
+          newQuantity: Number(updated.currentQuantity),
+        };
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'adjust stock');
+    }
+  }
+
+  async getLowStockItems(threshold?: number) {
+    try {
+      return await this.prisma.inventory.findMany({
+        where: {
+          currentQuantity: {
+            lte: threshold || 10,
+          },
+        },
+        include: {
+          product: true,
+          subInventories: {
+            include: {
+              warehouse: true,
+              supplier: true,
+            },
+          },
+        },
+        orderBy: { currentQuantity: 'asc' },
+      });
+    } catch (error) {
+      this.errorService.handleError(error, 'get low stock items');
+    }
+  }
+
+  async getInventoryStats(inventoryId: string) {
+    try {
+      const inventory = await this.findInventoryById(inventoryId);
+
+      const subInventories = await this.prisma.subInventory.findMany({
+        where: { inventoryId },
+      });
+
+      const totalValue = subInventories.reduce(
+        (sum, sub) => sum + Number(sub.unitPrice),
+        0,
+      );
+
+      const avgPrice =
+        subInventories.length > 0 ? totalValue / subInventories.length : 0;
+
+      return {
+        inventoryId,
+        productName: inventory.product.name,
+        totalQuantity: Number(inventory.currentQuantity),
+        totalBatches: subInventories.length,
+        averagePrice: avgPrice.toFixed(2),
+        totalValue: totalValue.toFixed(2),
+        stockStatus: this.getStockStatus(
+          Number(inventory.currentQuantity),
+          Number(inventory.minStockLevel),
+          Number(inventory.maxStockLevel),
+        ),
+      };
+    } catch (error) {
+      this.errorService.handleError(error, 'get inventory stats');
+    }
+  }
+
+  // ==================== HELPER METHODS ====================
+
+  private getStockStatus(current: number, min: number, max: number): string {
+    if (current <= min) return 'LOW';
+    if (current >= max) return 'OVERSTOCKED';
+    return 'NORMAL';
   }
 }
