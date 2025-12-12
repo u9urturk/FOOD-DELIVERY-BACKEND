@@ -41,7 +41,6 @@ export class ProductController {
         name: 'Cheeseburger',
         description: 'Delicious beef burger with cheese',
         sku: 'CHE-BU-001',
-        barcode: '1234567890123',
         status: 'ACTIVE',
         categoryId: 'b3f8a6e2-1c2d-4f5a-9e5d-0a1b2c3d4e5f',
         stockTypeId: 'd4f8b6c2-2b3c-4a5d-9e6f-1b2c3d4e5f6a',

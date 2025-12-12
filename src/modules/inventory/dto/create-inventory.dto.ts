@@ -10,15 +10,6 @@ export class CreateInventoryDto {
   @IsString()
   productId: string;
 
-  @ApiProperty({
-    description: 'Current quantity in stock',
-    example: 100,
-    minimum: 0,
-  })
-  @IsNumber()
-  @Min(0)
-  @Type(() => Number)
-  currentQuantity: number;
 
   @ApiProperty({
     description: 'Minimum stock level (triggers low stock alert)',
@@ -55,4 +46,12 @@ export class CreateInventoryDto {
   @IsOptional()
   @IsDateString()
   expirationDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Additional notes or description for inventory',
+    example: 'Special storage requirements',
+  })
+  @IsOptional()
+  @IsString()
+  desc?: string;
 }

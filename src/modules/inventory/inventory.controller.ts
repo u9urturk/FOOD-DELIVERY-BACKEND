@@ -17,6 +17,7 @@ import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { CreateSubInventoryDto } from './dto/create-sub-inventory.dto';
 import { UpdateSubInventoryDto } from './dto/update-sub-inventory.dto';
 import { StockAdjustmentDto } from './dto/stock-adjustment.dto';
+import { QuickAddInventoryDto } from './dto/quick-add-inventory.dto';
 
 @ApiTags('Inventory Management')
 @Controller('api/v1/inventory')
@@ -156,4 +157,33 @@ export class InventoryController {
   getLowStockItems(@Query('threshold') threshold?: number) {
     return this.inventoryService.getLowStockItems(threshold);
   }
+
+  // ==================== QUICK ADD & SEARCH ====================
+
+  @Post('quick-add')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ 
+    summary: 'Quick add inventory', 
+    description: 'Search for product by name/barcode, create if not exists, create inventory, and add batch in a single transaction' 
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Inventory added successfully. Returns complete inventory information including whether new product/inventory was created' 
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error or missing required fields for new product' })
+  quickAddInventory(@Body() dto: QuickAddInventoryDto) {
+    return this.inventoryService.quickAddInventory(dto);
+  }
+
+  @Get('search')
+  @ApiOperation({ 
+    summary: 'Search inventory', 
+    description: 'Search for products and their inventory by name or barcode' 
+  })
+  @ApiQuery({ name: 'query', description: 'Search query (product name or barcode)', example: 'tomato', type: String })
+  @ApiResponse({ status: 200, description: 'Search results with inventory information' })
+  searchInventory(@Query('query') query: string) {
+    return this.inventoryService.searchInventory(query);
+  }
 }
+

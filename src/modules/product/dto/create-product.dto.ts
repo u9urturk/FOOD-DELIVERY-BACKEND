@@ -4,11 +4,6 @@ import { ProductStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 
 export class CreateProductDto {
-  @ApiProperty({ example: '1234567890123', required: false })
-  @IsOptional()
-  @IsString()
-  barcode?: string;
-
   @ApiProperty({ example: 'Cheeseburger', description: 'Product name' })
   @IsString()
   name: string;

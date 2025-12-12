@@ -52,4 +52,12 @@ export class CreateSubInventoryDto {
   @IsOptional()
   @IsDateString()
   expirationDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Additional notes or description for this batch',
+    example: 'Organic certified batch from Farm A',
+  })
+  @IsOptional()
+  @IsString()
+  desc?: string;
 }
