@@ -19,10 +19,10 @@ export class ProductService {
       return await this.prisma.product.findMany({
         include: {
           category: true,
-          stockType: true,
           baseUnit: true,
           inventory: {
             include: {
+              stockType: true,
               subInventories: {
                 include: {
                   warehouse: true,
@@ -45,10 +45,10 @@ export class ProductService {
         where: { id },
         include: {
           category: true,
-          stockType: true,
           baseUnit: true,
           inventory: {
             include: {
+              stockType: true,
               subInventories: {
                 include: {
                   warehouse: true,
@@ -76,9 +76,12 @@ export class ProductService {
         where: { categoryId },
         include: {
           category: true,
-          stockType: true,
           baseUnit: true,
-          inventory: true,
+          inventory: {
+            include: {
+              stockType: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -93,7 +96,6 @@ export class ProductService {
         data: dto,
         include: {
           category: true,
-          stockType: true,
           baseUnit: true,
         },
       });
@@ -113,7 +115,6 @@ export class ProductService {
         data: dto,
         include: {
           category: true,
-          stockType: true,
           baseUnit: true,
         },
       });
@@ -147,7 +148,6 @@ export class ProductService {
         data: { status },
         include: {
           category: true,
-          stockType: true,
           baseUnit: true,
         },
       });
@@ -162,9 +162,12 @@ export class ProductService {
         where: { status: ProductStatus.ACTIVE },
         include: {
           category: true,
-          stockType: true,
           baseUnit: true,
-          inventory: true,
+          inventory: {
+            include: {
+              stockType: true,
+            },
+          },
         },
         orderBy: { name: 'asc' },
       });
@@ -186,9 +189,12 @@ export class ProductService {
         },
         include: {
           category: true,
-          stockType: true,
           baseUnit: true,
-          inventory: true,
+          inventory: {
+            include: {
+              stockType: true,
+            },
+          },
         },
       });
     } catch (e) {

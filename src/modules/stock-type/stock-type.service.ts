@@ -15,25 +15,25 @@ export class StockTypeService {
     mostUsedStockType: StockTypeStatsDto;
     topStockTypes: string[];
   } {
-    const totalProducts = stockTypes.reduce((sum, st) => sum + st.products.length, 0);
+    const totalProducts = stockTypes.reduce((sum, st) => sum + st.inventories.length, 0);
     const averageProductsPerStockType = stockTypes.length > 0 ? Number((totalProducts / stockTypes.length).toFixed(1)) : 0;
 
     const mostUsed = stockTypes.reduce((max, current) => 
-      current.products.length > max.products.length ? current : max, 
-      stockTypes[0] || { products: [], name: 'N/A', id: 'N/A' }
+      current.inventories.length > max.inventories.length ? current : max, 
+      stockTypes[0] || { inventories: [], name: 'N/A', id: 'N/A' }
     );
 
     const mostUsedStockType: StockTypeStatsDto = {
       mostUsedStockTypeId: mostUsed.id,
       mostUsedStockTypeName: mostUsed.name,
-      mostUsedCount: mostUsed.products.length,
-      mostUsedPercentage: totalProducts > 0 ? Number(((mostUsed.products.length / totalProducts) * 100).toFixed(1)) : 0
+      mostUsedCount: mostUsed.inventories.length,
+      mostUsedPercentage: totalProducts > 0 ? Number(((mostUsed.inventories.length / totalProducts) * 100).toFixed(1)) : 0
     };
 
     const topStockTypes = stockTypes
-      .sort((a, b) => b.products.length - a.products.length)
+      .sort((a, b) => b.inventories.length - a.inventories.length)
       .slice(0, 3)
-      .map(st => `${st.name}: ${st.products.length} ürün`);
+      .map(st => `${st.name}: ${st.inventories.length} envanter`);
 
     return {
       totalProducts,
@@ -47,7 +47,7 @@ export class StockTypeService {
     try {
       const stockTypes = await this.prisma.stockType.findMany({ 
         include: { 
-          products: {
+          inventories: {
             select: { id: true }
           }
         },
@@ -61,7 +61,7 @@ export class StockTypeService {
         color: stockType.color || 'from-blue-500 to-blue-600',
         icon: stockType.icon || '📦',
         examples: stockType.examples || [],
-        itemCount: stockType.products.length,
+        itemCount: stockType.inventories.length,
         isActive: stockType.isActive,
         createdAt: stockType.createdAt,
         updatedAt: stockType.updatedAt
@@ -95,7 +95,7 @@ export class StockTypeService {
       const stockType = await this.prisma.stockType.findUnique({ 
         where: { id }, 
         include: { 
-          products: {
+          inventories: {
             select: { id: true }
           }
         }
@@ -110,7 +110,7 @@ export class StockTypeService {
         color: stockType.color || 'from-blue-500 to-blue-600',
         icon: stockType.icon || '📦',
         examples: stockType.examples || [],
-        itemCount: stockType.products.length,
+        itemCount: stockType.inventories.length,
         isActive: stockType.isActive,
         createdAt: stockType.createdAt,
         updatedAt: stockType.updatedAt
@@ -125,7 +125,7 @@ export class StockTypeService {
       const stockTypes = await this.prisma.stockType.findMany({ 
         where: { isActive: true },
         include: { 
-          products: {
+          inventories: {
             select: { id: true }
           }
         },
@@ -139,7 +139,7 @@ export class StockTypeService {
         color: stockType.color || 'from-blue-500 to-blue-600',
         icon: stockType.icon || '📦',
         examples: stockType.examples || [],
-        itemCount: stockType.products.length,
+        itemCount: stockType.inventories.length,
         isActive: stockType.isActive,
         createdAt: stockType.createdAt,
         updatedAt: stockType.updatedAt
@@ -160,7 +160,7 @@ export class StockTypeService {
           examples: dto.examples || []
         },
         include: { 
-          products: {
+          inventories: {
             select: { id: true }
           }
         }
@@ -173,7 +173,7 @@ export class StockTypeService {
         color: stockType.color || 'from-blue-500 to-blue-600',
         icon: stockType.icon || '📦',
         examples: stockType.examples || [],
-        itemCount: stockType.products.length,
+        itemCount: stockType.inventories.length,
         isActive: stockType.isActive,
         createdAt: stockType.createdAt,
         updatedAt: stockType.updatedAt
@@ -189,7 +189,7 @@ export class StockTypeService {
         where: { id }, 
         data: dto,
         include: { 
-          products: {
+          inventories: {
             select: { id: true }
           }
         }
@@ -202,7 +202,7 @@ export class StockTypeService {
         color: stockType.color || 'from-blue-500 to-blue-600',
         icon: stockType.icon || '📦',
         examples: stockType.examples || [],
-        itemCount: stockType.products.length,
+        itemCount: stockType.inventories.length,
         isActive: stockType.isActive,
         createdAt: stockType.createdAt,
         updatedAt: stockType.updatedAt
@@ -224,7 +224,7 @@ export class StockTypeService {
         where: { id },
         data: { isActive: !currentStockType.isActive },
         include: { 
-          products: {
+          inventories: {
             select: { id: true }
           }
         }
@@ -237,7 +237,7 @@ export class StockTypeService {
         color: stockType.color || 'from-blue-500 to-blue-600',
         icon: stockType.icon || '📦',
         examples: stockType.examples || [],
-        itemCount: stockType.products.length,
+        itemCount: stockType.inventories.length,
         isActive: stockType.isActive,
         createdAt: stockType.createdAt,
         updatedAt: stockType.updatedAt
@@ -249,16 +249,16 @@ export class StockTypeService {
 
   async remove(id: string) {
     try {
-      // İlişkili ürün kontrolü
-      const stockTypeWithProducts = await this.prisma.stockType.findUnique({
+      // İlişkili envanter kontrolü
+      const stockTypeWithInventories = await this.prisma.stockType.findUnique({
         where: { id },
-        include: { products: true }
+        include: { inventories: true }
       });
 
-      if (!stockTypeWithProducts) this.errorService.throwNotFound('StockType');
+      if (!stockTypeWithInventories) this.errorService.throwNotFound('StockType');
 
-      if (stockTypeWithProducts.products.length > 0) {
-        throw new Error(`Bu stok türüne ait ${stockTypeWithProducts.products.length} ürün bulunmaktadır. Önce ürünleri başka bir stok türüne taşıyın.`);
+      if (stockTypeWithInventories.inventories.length > 0) {
+        throw new Error(`Bu stok türüne ait ${stockTypeWithInventories.inventories.length} envanter kaydı bulunmaktadır. Önce envanterleri başka bir stok türüne taşıyın.`);
       }
 
       await this.prisma.stockType.delete({ where: { id } });

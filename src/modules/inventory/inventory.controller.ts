@@ -18,9 +18,11 @@ import { CreateSubInventoryDto } from './dto/create-sub-inventory.dto';
 import { UpdateSubInventoryDto } from './dto/update-sub-inventory.dto';
 import { StockAdjustmentDto } from './dto/stock-adjustment.dto';
 import { QuickAddInventoryDto } from './dto/quick-add-inventory.dto';
+import { CheckProductExistsDto } from './dto/check-product-exists.dto';
+import { InventorySummaryResponseDto } from './dto/inventory-summary-response.dto';
 
 @ApiTags('Inventory Management')
-@Controller('api/v1/inventory')
+@Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
@@ -160,6 +162,21 @@ export class InventoryController {
 
   // ==================== QUICK ADD & SEARCH ====================
 
+  @Post('check-product')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Check if product exists', 
+    description: 'Check if a product exists by barcode (in SubInventory) or product name. Returns product and inventory information if found.' 
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Product check completed. Returns exists flag and product/inventory details if found.' 
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - either productName or barcode must be provided' })
+  checkProductExists(@Body() dto: CheckProductExistsDto) {
+    return this.inventoryService.checkProductExists(dto.productName, dto.barcode);
+  }
+
   @Post('quick-add')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ 
@@ -172,6 +189,7 @@ export class InventoryController {
   })
   @ApiResponse({ status: 400, description: 'Bad request - validation error or missing required fields for new product' })
   quickAddInventory(@Body() dto: QuickAddInventoryDto) {
+    console.log('Received QuickAddInventoryDto:', dto);
     return this.inventoryService.quickAddInventory(dto);
   }
 
@@ -185,5 +203,18 @@ export class InventoryController {
   searchInventory(@Query('query') query: string) {
     return this.inventoryService.searchInventory(query);
   }
-}
 
+  @Get('summary/all')
+  @ApiOperation({ 
+    summary: 'Get all inventories summary', 
+    description: 'Get comprehensive summary of all inventories with key metrics: productName, barcode, minStock, averagePrice, lastCountedAt, totalStock' 
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Inventories summary retrieved successfully with statistics',
+    type: InventorySummaryResponseDto,
+  })
+  getInventoriesSummary() {
+    return this.inventoryService.getInventoriesSummary();
+  }
+}

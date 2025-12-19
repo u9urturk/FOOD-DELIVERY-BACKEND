@@ -10,6 +10,14 @@ export class CreateSubInventoryDto {
   @IsString()
   inventoryId: string;
 
+  @ApiPropertyOptional({
+    description: 'Barcode for this specific batch/lot',
+    example: '1234567890123',
+  })
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
   @ApiProperty({
     description: 'Warehouse ID where this batch is stored',
     example: '660e8400-e29b-41d4-a716-446655440001',
@@ -51,7 +59,8 @@ export class CreateSubInventoryDto {
   })
   @IsOptional()
   @IsDateString()
-  expirationDate?: string;
+  @Type(() => Date)
+  expirationDate?: Date;
 
   @ApiPropertyOptional({
     description: 'Additional notes or description for this batch',
