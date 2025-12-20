@@ -24,7 +24,7 @@ import { InventorySummaryResponseDto } from './dto/inventory-summary-response.dt
 @ApiTags('Inventory Management')
 @Controller('inventory')
 export class InventoryController {
-  constructor(private readonly inventoryService: InventoryService) {}
+  constructor(private readonly inventoryService: InventoryService) { }
 
   // ==================== INVENTORY ENDPOINTS ====================
 
@@ -98,6 +98,7 @@ export class InventoryController {
   @ApiResponse({ status: 201, description: 'Sub-inventory created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   createSubInventory(@Body() dto: CreateSubInventoryDto) {
+    console.log('Received CreateSubInventoryDto:', dto);
     return this.inventoryService.createSubInventory(dto);
   }
 
@@ -164,13 +165,13 @@ export class InventoryController {
 
   @Post('check-product')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Check if product exists', 
-    description: 'Check if a product exists by barcode (in SubInventory) or product name. Returns product and inventory information if found.' 
+  @ApiOperation({
+    summary: 'Check if product exists',
+    description: 'Check if a product exists by barcode (in SubInventory) or product name. Returns product and inventory information if found.'
   })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Product check completed. Returns exists flag and product/inventory details if found.' 
+  @ApiResponse({
+    status: 200,
+    description: 'Product check completed. Returns exists flag and product/inventory details if found.'
   })
   @ApiResponse({ status: 400, description: 'Bad request - either productName or barcode must be provided' })
   checkProductExists(@Body() dto: CheckProductExistsDto) {
@@ -179,13 +180,13 @@ export class InventoryController {
 
   @Post('quick-add')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ 
-    summary: 'Quick add inventory', 
-    description: 'Search for product by name/barcode, create if not exists, create inventory, and add batch in a single transaction' 
+  @ApiOperation({
+    summary: 'Quick add inventory',
+    description: 'Search for product by name/barcode, create if not exists, create inventory, and add batch in a single transaction'
   })
-  @ApiResponse({ 
-    status: 201, 
-    description: 'Inventory added successfully. Returns complete inventory information including whether new product/inventory was created' 
+  @ApiResponse({
+    status: 201,
+    description: 'Inventory added successfully. Returns complete inventory information including whether new product/inventory was created'
   })
   @ApiResponse({ status: 400, description: 'Bad request - validation error or missing required fields for new product' })
   quickAddInventory(@Body() dto: QuickAddInventoryDto) {
@@ -194,9 +195,9 @@ export class InventoryController {
   }
 
   @Get('search')
-  @ApiOperation({ 
-    summary: 'Search inventory', 
-    description: 'Search for products and their inventory by name or barcode' 
+  @ApiOperation({
+    summary: 'Search inventory',
+    description: 'Search for products and their inventory by name or barcode'
   })
   @ApiQuery({ name: 'query', description: 'Search query (product name or barcode)', example: 'tomato', type: String })
   @ApiResponse({ status: 200, description: 'Search results with inventory information' })
@@ -205,12 +206,12 @@ export class InventoryController {
   }
 
   @Get('summary/all')
-  @ApiOperation({ 
-    summary: 'Get all inventories summary', 
-    description: 'Get comprehensive summary of all inventories with key metrics: productName, barcode, minStock, averagePrice, lastCountedAt, totalStock' 
+  @ApiOperation({
+    summary: 'Get all inventories summary',
+    description: 'Get comprehensive summary of all inventories with key metrics: productName, barcode, minStock, averagePrice, lastCountedAt, totalStock'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Inventories summary retrieved successfully with statistics',
     type: InventorySummaryResponseDto,
   })

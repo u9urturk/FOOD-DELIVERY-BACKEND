@@ -284,7 +284,7 @@ model SubInventory {
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
   supplier  Supplier? @relation(fields: [supplierId], references: [id])
 
-  barcode        String?   @unique
+  barcode        String?  
   quantity       Decimal   @db.Decimal(10, 2)
   unitPrice      Decimal   @db.Decimal(10, 2)
   expirationDate DateTime?

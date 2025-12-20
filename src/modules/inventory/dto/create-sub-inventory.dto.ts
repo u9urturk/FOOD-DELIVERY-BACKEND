@@ -57,8 +57,8 @@ export class CreateSubInventoryDto {
     description: 'Expiration date for this batch',
     example: '2026-06-15T00:00:00Z',
   })
+
   @IsOptional()
-  @IsDateString()
   @Type(() => Date)
   expirationDate?: Date;
 

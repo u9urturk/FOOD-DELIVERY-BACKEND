@@ -237,14 +237,8 @@ CREATE TABLE "public"."products" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
-    "sku" TEXT,
-    "barcode" TEXT,
-    "note" TEXT,
-    "imageUrls" TEXT[],
-    "price" DECIMAL(10,2) NOT NULL,
     "status" "public"."ProductStatus" NOT NULL DEFAULT 'ACTIVE',
     "categoryId" TEXT NOT NULL,
-    "stockTypeId" TEXT NOT NULL,
     "baseUnitId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -253,30 +247,35 @@ CREATE TABLE "public"."products" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."movement_types" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "desc" TEXT,
-
-    CONSTRAINT "movement_types_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "public"."inventories" (
     "id" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
-    "warehouseId" TEXT NOT NULL,
-    "supplierId" TEXT,
-    "currentQuantity" DECIMAL(10,3) NOT NULL,
+    "stockTypeId" TEXT NOT NULL,
     "minStockLevel" DECIMAL(10,3) NOT NULL,
     "maxStockLevel" DECIMAL(10,3) NOT NULL,
     "lastCountedAt" TIMESTAMP(3),
-    "lotNumber" TEXT,
-    "expirationDate" TIMESTAMP(3),
+    "desc" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "inventories_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."sub_inventories" (
+    "id" TEXT NOT NULL,
+    "inventoryId" TEXT NOT NULL,
+    "warehouseId" TEXT NOT NULL,
+    "supplierId" TEXT,
+    "barcode" TEXT,
+    "quantity" DECIMAL(10,2) NOT NULL,
+    "unitPrice" DECIMAL(10,2) NOT NULL,
+    "expirationDate" TIMESTAMP(3),
+    "desc" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "sub_inventories_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -298,6 +297,15 @@ CREATE TABLE "public"."warehouses" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "warehouses_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."movement_types" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "desc" TEXT,
+
+    CONSTRAINT "movement_types_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -413,10 +421,22 @@ CREATE UNIQUE INDEX "stock_types_name_key" ON "public"."stock_types"("name");
 CREATE UNIQUE INDEX "categories_name_key" ON "public"."categories"("name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "movement_types_name_key" ON "public"."movement_types"("name");
+CREATE UNIQUE INDEX "inventories_productId_key" ON "public"."inventories"("productId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "sub_inventories_barcode_key" ON "public"."sub_inventories"("barcode");
+
+-- CreateIndex
+CREATE INDEX "sub_inventories_barcode_idx" ON "public"."sub_inventories"("barcode");
+
+-- CreateIndex
+CREATE INDEX "sub_inventories_inventoryId_idx" ON "public"."sub_inventories"("inventoryId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "warehouses_code_key" ON "public"."warehouses"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "movement_types_name_key" ON "public"."movement_types"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "revenue_data_date_period_key" ON "public"."revenue_data"("date", "period");
@@ -449,19 +469,22 @@ ALTER TABLE "public"."role_permissions" ADD CONSTRAINT "role_permissions_permiss
 ALTER TABLE "public"."products" ADD CONSTRAINT "products_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "public"."categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."products" ADD CONSTRAINT "products_stockTypeId_fkey" FOREIGN KEY ("stockTypeId") REFERENCES "public"."stock_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "public"."products" ADD CONSTRAINT "products_baseUnitId_fkey" FOREIGN KEY ("baseUnitId") REFERENCES "public"."base_units"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."inventories" ADD CONSTRAINT "inventories_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."inventories" ADD CONSTRAINT "inventories_warehouseId_fkey" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."inventories" ADD CONSTRAINT "inventories_stockTypeId_fkey" FOREIGN KEY ("stockTypeId") REFERENCES "public"."stock_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."inventories" ADD CONSTRAINT "inventories_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "public"."suppliers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."sub_inventories" ADD CONSTRAINT "sub_inventories_inventoryId_fkey" FOREIGN KEY ("inventoryId") REFERENCES "public"."inventories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."sub_inventories" ADD CONSTRAINT "sub_inventories_warehouseId_fkey" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."sub_inventories" ADD CONSTRAINT "sub_inventories_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "public"."suppliers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."inventory_movements" ADD CONSTRAINT "inventory_movements_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
